@@ -199,6 +199,25 @@ extension HDF5AttributeContainer {
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
             defer { H5Tclose(typeId) }
 
+            // Special handling for String types
+            if T.self == String.self {
+                let size = H5Tget_size(typeId)
+                guard size > 0 else { return "" as! T }
+
+                var buffer = [UInt8](repeating: 0, count: size)
+                let res = buffer.withUnsafeMutableBufferPointer { ptr in
+                    H5Aread(attrId, typeId, ptr.baseAddress)
+                }
+                guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
+
+                let len = buffer.firstIndex(of: 0) ?? buffer.count
+                let str =
+                    String(bytes: buffer[..<len], encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespaces) ?? ""
+                return str as! T
+            }
+
+            // Generic handling for fixed-size Numeric/POD types
             return try withUnsafeTemporaryAllocation(of: T.self, capacity: 1) { buffer -> T in
                 guard H5Aread(attrId, typeId, buffer.baseAddress) >= 0 else {
                     throw HDF5Error.attributeReadFailed(name)
@@ -260,7 +279,7 @@ public struct HDF5File: HDF5Container, HDF5AttributeContainer {
 
 // MARK: - HDF5 Group
 
-public struct HDF5Group: HDF5Container, HDF5Closable {
+public struct HDF5Group: HDF5Container, HDF5Closable, HDF5AttributeContainer {
     public let name: String
     internal let handle: HDF5Handle
     public let fileReference: HDF5File?
