@@ -1,10 +1,13 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
     name: "SwiftHDF5",
+    platforms: [
+        .macOS("15")
+    ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
@@ -18,10 +21,11 @@ let package = Package(
         .systemLibrary(
             name: "CHDF5",
             pkgConfig: "hdf5",
-            providers: [.apt(["hdf5"]), .yum(["hdf5"]), .brew(["hdf5"])]
+            providers: [.apt(["libhdf5-dev"]), .yum(["hdf5"]), .brew(["hdf5"])]
         ),
         .target(
-            name: "SwiftHDF5", dependencies: ["CHDF5"]
+            name: "SwiftHDF5",
+            dependencies: ["CHDF5"]
         ),
         .testTarget(
             name: "SwiftHDF5Tests",
