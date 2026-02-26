@@ -54,7 +54,7 @@ final class HDF5Handle: Sendable {
     deinit {
         // Important! Must capture copy of closer and id, not self
         Task { [closer, id] in
-            await MainActor.shared.synchronized {
+            await HDF5ActorLock.shared.synchronized {
                 closer(id)
             }
         }
@@ -62,7 +62,7 @@ final class HDF5Handle: Sendable {
 
     // @discardableResult
     // private func closeInternal() async -> herr_t {
-    //     await MainActor.shared.synchronized {
+    //     await HDF5ActorLock.shared.synchronized {
     //         guard isValid, id >= 0 else { return 0 }
     //         let result = closer(id)
     //         isValid = false
@@ -75,7 +75,7 @@ final class HDF5Handle: Sendable {
     func close() async throws -> Bool {
         // Important! Must capture copy of closer and id, not self
         Task { [closer, id] in
-            await MainActor.shared.synchronized {
+            await HDF5ActorLock.shared.synchronized {
                 closer(id)
             }
         }
@@ -108,7 +108,7 @@ public protocol HDF5Container: HDF5Object {
 
 extension HDF5Container {
     public func openGroup(_ groupName: String) async throws -> HDF5Group {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             guard let file = fileReference else {
                 throw HDF5Error.groupOpenFailed(groupName)
             }
@@ -122,7 +122,7 @@ extension HDF5Container {
     }
 
     public func createGroup(_ groupName: String) async throws -> HDF5Group {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             guard let file = fileReference else {
                 throw HDF5Error.groupCreateFailed(groupName)
             }
@@ -142,7 +142,7 @@ extension HDF5Container {
     }
 
     public func openDataset(_ datasetName: String) async throws -> HDF5Dataset {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let datasetId = datasetName.withCString {
                 H5Dopen2(id, $0, hdf5_get_p_default())
             }
@@ -157,7 +157,7 @@ extension HDF5Container {
         datatype: hid_t,
         dataspace: HDF5Dataspace
     ) async throws -> HDF5Dataset {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let datasetId = datasetName.withCString {
                 H5Dcreate2(
                     id,
@@ -183,7 +183,7 @@ public protocol HDF5AttributeContainer: HDF5Object {
 
 extension HDF5AttributeContainer {
     public func writeAttribute<T: Sendable>(_ name: String, value: T, datatype: hid_t) async throws {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let dataspaceId = H5Screate(hdf5_get_s_scalar())
             guard dataspaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
             defer { H5Sclose(dataspaceId) }
@@ -210,7 +210,7 @@ extension HDF5AttributeContainer {
     }
 
     public func readAttribute<T: Sendable>(_ name: String) async throws -> T {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let attrId = name.withCString {
                 H5Aopen(id, $0, hdf5_get_p_default())
             }
@@ -254,7 +254,7 @@ extension HDF5AttributeContainer {
 
 public struct SwiftHDF {
     public static func open(file: String, mode: FileAccessMode = .readOnly) async throws -> HDF5File {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             _ = H5open()
             let fileId = file.withCString { cPath in
                 H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
@@ -265,7 +265,7 @@ public struct SwiftHDF {
     }
 
     public static func create(file: String, mode: FileAccessMode = .truncate) async throws -> HDF5File {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             _ = H5open()
             let fileId = file.withCString { cPath in
                 H5Fcreate(
@@ -327,7 +327,7 @@ public struct HDF5Dataspace: HDF5Object, HDF5Closable {
     public var id: hid_t { handle.id }
 
     public init(dimensions: [hsize_t]) async throws {
-        let spaceId = await MainActor.shared.synchronized {
+        let spaceId = await HDF5ActorLock.shared.synchronized {
             dimensions.withUnsafeBufferPointer { ptr in
                 H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
             }
@@ -337,7 +337,7 @@ public struct HDF5Dataspace: HDF5Object, HDF5Closable {
     }
 
     public init() async throws {
-        let spaceId = await MainActor.shared.synchronized {
+        let spaceId = await HDF5ActorLock.shared.synchronized {
             H5Screate(hdf5_get_s_scalar())
         }
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
@@ -349,7 +349,7 @@ public struct HDF5Dataspace: HDF5Object, HDF5Closable {
     }
 
     public func getDimensions() async throws -> [hsize_t] {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let ndims = H5Sget_simple_extent_ndims(id)
             guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
 
@@ -377,7 +377,7 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
     }
 
     public func getSpace() async throws -> HDF5Dataspace {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let spaceId = H5Dget_space(id)
             guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
             return HDF5Dataspace(id: spaceId)
@@ -385,7 +385,7 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
     }
 
     public func read<T: Sendable>() async throws -> [T] where T: Numeric {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let spaceId = H5Dget_space(id)
             guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
             defer { H5Sclose(spaceId) }
@@ -422,7 +422,7 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
     }
 
     public func write<T: Sendable>(_ data: [T]) async throws {
-        try await MainActor.shared.synchronized {
+        try await HDF5ActorLock.shared.synchronized {
             let typeId = H5Dget_type(id)
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
             defer { H5Tclose(typeId) }
