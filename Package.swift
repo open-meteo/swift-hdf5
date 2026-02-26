@@ -24,7 +24,8 @@ let package = Package(
             providers: [.apt(["libhdf5-dev"]), .yum(["hdf5"]), .brew(["hdf5"])]
         ),
         .target(
-            name: "SwiftHDF5", dependencies: ["CHDF5"]
+            name: "SwiftHDF5",
+            dependencies: ["CHDF5"]
         ),
         .testTarget(
             name: "SwiftHDF5Tests",
