@@ -23,7 +23,9 @@ dependencies: [
 targets: [
     .target(
         name: "YourTarget",
-        dependencies: ["SwiftHDF5"]
+        dependencies: [
+            .product(name: "SwiftHDF5", package: "swift-hdf5"),
+        ]
     )
 ]
 ```
