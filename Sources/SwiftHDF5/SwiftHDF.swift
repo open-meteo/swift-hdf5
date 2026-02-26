@@ -274,10 +274,8 @@ public actor HDF5 {
 
     public func readDataset<T: Sendable>(
         _ dataset: HDF5DatasetRef,
-        into buffer: consuming [T]
-    ) throws -> [T] {
-        var buffer = consume buffer
-
+        into buffer: inout [T]
+    ) throws {
         let typeId = H5Dget_type(dataset.id)
         guard typeId >= 0 else { throw HDF5Error.invalidDataType }
         defer { H5Tclose(typeId) }
@@ -293,7 +291,6 @@ public actor HDF5 {
             )
         }
         guard res >= 0 else { throw HDF5Error.datasetReadFailed(dataset.name) }
-        return buffer
     }
 
     // MARK: - Attribute operations

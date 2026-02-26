@@ -88,7 +88,7 @@ struct SwiftHDF5Tests {
 
         // Also test read(into:)
         var preallocated = [Int32](repeating: 0, count: 10)
-        preallocated = try await hdf5.readDataset(reopenedDataset, into: preallocated)
+        try await hdf5.readDataset(reopenedDataset, into: &preallocated)
         #expect(preallocated == data)
 
         try await hdf5.closeDataset(reopenedDataset)
@@ -165,7 +165,7 @@ struct SwiftHDF5Tests {
         await hdf5.closeDataspace(space)
 
         var readData = [Float](repeating: 0, count: 12)
-        readData = try await hdf5.readDataset(reopenedDataset, into: readData)
+        try await hdf5.readDataset(reopenedDataset, into: &readData)
         #expect(readData.count == 12)
         #expect(abs(readData[5] - 6.0) < 0.001)
 
@@ -278,7 +278,7 @@ struct SwiftHDF5Tests {
         #expect(sensorId == 7)
 
         var readMeasurements = [Double](repeating: 0, count: 100)
-        readMeasurements = try await hdf5.readDataset(readDataset, into: readMeasurements)
+        try await hdf5.readDataset(readDataset, into: &readMeasurements)
         #expect(readMeasurements.count == 100)
         #expect(abs(readMeasurements[50] - 25.0) < 0.001)
 
@@ -332,7 +332,7 @@ struct SwiftHDF5Tests {
         let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let readDs8 = try await hdf5.openDataset("int8_data", in: readFile)
         var read8 = [Int8](repeating: 0, count: 3)
-        read8 = try await hdf5.readDataset(readDs8, into: read8)
+        try await hdf5.readDataset(readDs8, into: &read8)
         #expect(read8 == [1, 2, 3])
 
         try await hdf5.closeDataset(readDs8)
