@@ -87,11 +87,5 @@ jobs:
           -Xswiftc -strict-concurrency=complete
           -Xswiftc -warnings-as-errors
 
-      - name: Install SwiftLint
-        run: |
-          apt-get -qq -y install curl unzip
-          curl -sSL https://github.com/realm/SwiftLint/releases/latest/download/swiftlint_linux.zip -o swiftlint.zip
-          unzip -q swiftlint.zip swiftlint -d /usr/local/bin
-
-      - name: Lint
-        run: swiftlint lint --reporter github-actions-logging
+      - name: GitHub Action for SwiftLint
+        uses: norio-nomura/action-swiftlint@3.2.1
