@@ -90,7 +90,6 @@ public actor HDF5 {
 
     private init() {
         H5open()
-        hdf5_disable_auto_print()
     }
 
     // MARK: - File operations
@@ -363,39 +362,6 @@ public actor HDF5 {
             }
             return buffer[0]
         }
-    }
-
-    public func readErrorStack() -> String {
-        var messages: [String] = []
-
-        // H5Ewalk2 walks the error stack and calls the closure for each frame
-        withUnsafeMutablePointer(to: &messages) { ptr in
-            H5Ewalk2(
-                hdf5_get_e_default(),
-                H5E_WALK_DOWNWARD,
-                { _, errorInfo, userData in
-                    guard let errorInfo = errorInfo,
-                        let userData = userData
-                    else { return 0 }
-
-                    let messagesPtr = userData.assumingMemoryBound(to: [String].self)
-
-                    // Read the minor message directly from the error info struct
-                    if let desc = errorInfo.pointee.desc {
-                        messagesPtr.pointee.append(String(cString: desc))
-                    }
-                    if let funcName = errorInfo.pointee.func_name {
-                        messagesPtr.pointee.append(String(cString: funcName))
-                    }
-
-                    return 0
-                },
-                ptr
-            )
-        }
-
-        H5Eclear2(hdf5_get_e_default())
-        return messages.joined(separator: " | ")
     }
 }
 

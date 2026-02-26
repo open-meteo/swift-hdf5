@@ -339,39 +339,4 @@ struct SwiftHDF5Tests {
         try await hdf5.closeFile(readFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
-
-    @Test("HDF5 error stack may be corrupted across split await points (Thread Local Storage vulnerability)")
-    func testErrorStackCorruptionWithSplitAwait() async throws {
-        let tempDir = FileManager.default.temporaryDirectory
-        let testFile = tempDir.appendingPathComponent("test_tls_split.h5").path
-        try? FileManager.default.removeItem(atPath: testFile)
-        defer { try? FileManager.default.removeItem(atPath: testFile) }
-
-        let file = try await hdf5.createFile(testFile, mode: .truncate)
-
-        actor CorruptionActor {
-            var isCorrupted = false
-            func setCorrupted() {
-                self.isCorrupted = true
-            }
-        }
-        let corruptor = CorruptionActor()
-
-        for iteration in 0..<200 {
-            let group = try? await hdf5.openGroup("missing_\(iteration)", in: file)
-            if let group {
-                try await hdf5.closeGroup(group)
-            }
-            let errorMessage = await hdf5.readErrorStack()
-            let isMissing = errorMessage.contains("missing_\(iteration)")
-
-            if !isMissing {
-                await corruptor.setCorrupted()
-            }
-        }
-
-        try? await hdf5.closeFile(file)
-
-        #expect(await corruptor.isCorrupted == false)
-    }
 }
