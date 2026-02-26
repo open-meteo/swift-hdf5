@@ -44,7 +44,7 @@ jobs:
 
       - name: Install hdf5 (Linux)
         if: runner.os == 'Linux'
-        run: apt-get update && apt-get -qq -y install libhdf5-dev
+        run: sudo apt-get update && sudo apt-get -qq -y install libhdf5-dev
 
       - name: Build
         run: swift build --build-tests
@@ -75,7 +75,7 @@ jobs:
             ubuntu-latest-swift-6.2-spm-
 
       - name: Install hdf5 (Linux)
-        run: apt-get update && apt-get -qq -y install libhdf5-dev
+        run: sudo apt-get update && sudo apt-get -qq -y install libhdf5-dev
 
       - name: Resolve dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
