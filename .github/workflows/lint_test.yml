@@ -63,6 +63,9 @@ jobs:
           swift-version: "6.2"
           skip-verify-signature: true
 
+      - name: Run swift-format lint
+        run: swift-format lint --recursive .
+
       - name: Cache resolved dependencies
         id: cache-deps
         uses: actions/cache@v4
@@ -86,6 +89,3 @@ jobs:
           swift build
           -Xswiftc -strict-concurrency=complete
           -Xswiftc -warnings-as-errors
-
-      - name: GitHub Action for SwiftLint
-        uses: norio-nomura/action-swiftlint@3.2.1

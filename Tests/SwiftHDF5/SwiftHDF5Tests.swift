@@ -319,21 +319,30 @@ struct SwiftHDF5Tests {
         // Test Int8
         let space8 = try HDF5Dataspace(dimensions: [3])
         let ds8 = try file.createDataset(
-            "int8_data", datatype: HDF5Datatype.int8, dataspace: space8)
+            "int8_data",
+            datatype: HDF5Datatype.int8,
+            dataspace: space8
+        )
         let data8: [Int8] = [1, 2, 3]
         try ds8.write(data8)
 
         // Test UInt16
         let space16 = try HDF5Dataspace(dimensions: [2])
         let ds16 = try file.createDataset(
-            "uint16_data", datatype: HDF5Datatype.uint16, dataspace: space16)
+            "uint16_data",
+            datatype: HDF5Datatype.uint16,
+            dataspace: space16
+        )
         let data16: [UInt16] = [100, 200]
         try ds16.write(data16)
 
         // Test Int64
         let space64 = try HDF5Dataspace(dimensions: [4])
         let ds64 = try file.createDataset(
-            "int64_data", datatype: HDF5Datatype.int64, dataspace: space64)
+            "int64_data",
+            datatype: HDF5Datatype.int64,
+            dataspace: space64
+        )
         let data64: [Int64] = [1000, 2000, 3000, 4000]
         try ds64.write(data64)
 

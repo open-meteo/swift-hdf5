@@ -120,8 +120,12 @@ extension HDF5Container {
             }
             let groupId = groupName.withCString {
                 H5Gcreate2(
-                    id, $0, hdf5_get_p_default(),
-                    hdf5_get_p_default(), hdf5_get_p_default())
+                    id,
+                    $0,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
             }
             guard groupId >= 0 else { throw HDF5Error.groupCreateFailed(groupName) }
             let fullName = name.isEmpty ? groupName : "\(name)/\(groupName)"
@@ -148,9 +152,14 @@ extension HDF5Container {
         try HDF5Lock.synchronized {
             let datasetId = datasetName.withCString {
                 H5Dcreate2(
-                    id, $0, datatype, dataspace.id,
-                    hdf5_get_p_default(), hdf5_get_p_default(),
-                    hdf5_get_p_default())
+                    id,
+                    $0,
+                    datatype,
+                    dataspace.id,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
             }
             guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(datasetName) }
             let fullName = name.isEmpty ? datasetName : "\(name)/\(datasetName)"
@@ -173,8 +182,13 @@ extension HDF5AttributeContainer {
 
             let attrId = name.withCString {
                 H5Acreate2(
-                    id, $0, datatype, dataspaceId,
-                    hdf5_get_p_default(), hdf5_get_p_default())
+                    id,
+                    $0,
+                    datatype,
+                    dataspaceId,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
             }
             guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
             defer { H5Aclose(attrId) }
@@ -247,8 +261,11 @@ public struct SwiftHDF {
             _ = H5open()
             let fileId = file.withCString { cPath in
                 H5Fcreate(
-                    cPath, mode.cMode, hdf5_get_p_default(),
-                    hdf5_get_p_default())
+                    cPath,
+                    mode.cMode,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
             }
             guard fileId >= 0 else { throw HDF5Error.fileCreateFailed(file) }
             return HDF5File(path: file, id: fileId)
@@ -367,9 +384,13 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
 
             let res = buffer.withUnsafeMutableBufferPointer { ptr in
                 H5Dread(
-                    id, typeId,
-                    hdf5_get_s_all(), hdf5_get_s_all(), hdf5_get_p_default(),
-                    ptr.baseAddress)
+                    id,
+                    typeId,
+                    hdf5_get_s_all(),
+                    hdf5_get_s_all(),
+                    hdf5_get_p_default(),
+                    ptr.baseAddress
+                )
             }
             guard res >= 0 else { throw HDF5Error.datasetReadFailed(name) }
         }
@@ -399,9 +420,13 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
 
             let res = buffer.withUnsafeMutableBufferPointer { ptr in
                 H5Dread(
-                    id, typeId, hdf5_get_s_all(), hdf5_get_s_all(),
+                    id,
+                    typeId,
+                    hdf5_get_s_all(),
+                    hdf5_get_s_all(),
                     hdf5_get_p_default(),
-                    ptr.baseAddress)
+                    ptr.baseAddress
+                )
             }
             guard res >= 0 else { throw HDF5Error.datasetReadFailed(name) }
             return buffer
@@ -416,9 +441,13 @@ public struct HDF5Dataset: HDF5Object, HDF5Closable, HDF5AttributeContainer {
 
             let res = data.withUnsafeBufferPointer { ptr in
                 H5Dwrite(
-                    id, typeId, hdf5_get_s_all(), hdf5_get_s_all(),
+                    id,
+                    typeId,
+                    hdf5_get_s_all(),
+                    hdf5_get_s_all(),
                     hdf5_get_p_default(),
-                    ptr.baseAddress)
+                    ptr.baseAddress
+                )
             }
             guard res >= 0 else { throw HDF5Error.datasetWriteFailed(name) }
         }
