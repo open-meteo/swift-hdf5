@@ -1,4 +1,5 @@
 # SwiftHDF5
+![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-green.svg) ![Platforms](https://img.shields.io/badge/Platforms-macOS%20Linux-green.svg) [![Test](https://github.com/open-meteo/swift-hdf5/actions/workflows/lint_test.yml/badge.svg)](https://github.com/open-meteo/swift-hdf5/actions/workflows/lint_test.yml)
 
 A Swift wrapper for the HDF5 C library, providing a modern, type-safe interface for reading and writing HDF5 files.
 
@@ -8,7 +9,7 @@ SwiftHDF5 provides a Swift-friendly API for working with HDF5 files, similar to 
 
 ## Requirements
 
-- Swift 6.2 or later
+- Swift 6.0 or later
 - HDF5 library installed on your system
 
 ### Swift Package Manager
