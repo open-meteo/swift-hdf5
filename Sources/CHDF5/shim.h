@@ -39,4 +39,10 @@ static inline hid_t hdf5_get_native_char(void) { return H5T_NATIVE_CHAR; }
 // String type helper
 static inline hid_t hdf5_get_c_s1(void) { return H5T_C_S1; }
 
+// Error type
+static inline hid_t hdf5_get_e_default(void) { return H5E_DEFAULT; }
+static inline herr_t hdf5_disable_auto_print(void) {
+    return H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+}
+
 #endif // CHDF5_SHIM_H

@@ -7,25 +7,24 @@ import Testing
 @Suite("SwiftHDF5 Tests")
 struct SwiftHDF5Tests {
 
+    let hdf5 = HDF5.shared
+
     // MARK: - File Operations Tests
 
     @Test("Create and open HDF5 file")
     func testFileCreationAndOpening() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_create.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        // Create a new file
-        let file = try await SwiftHDF.create(file: testFile, mode: .truncate)
+        let file = try await hdf5.createFile(testFile, mode: .truncate)
         #expect(file.path == testFile)
 
-        // Open the file
-        let openedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
+        let openedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         #expect(openedFile.path == testFile)
 
-        // Clean up
+        try await hdf5.closeFile(openedFile)
+        try await hdf5.closeFile(file)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -35,26 +34,26 @@ struct SwiftHDF5Tests {
     func testGroupOperations() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_groups.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
+        let file = try await hdf5.createFile(testFile)
 
-        // Create a group
-        let group = try await file.createGroup("data")
+        let group = try await hdf5.createGroup("data", in: file)
         #expect(group.name == "data")
 
-        // Create a subgroup
-        let subgroup = try await group.createGroup("measurements")
+        let subgroup = try await hdf5.createGroup("measurements", in: group)
         #expect(subgroup.name == "data/measurements")
 
-        // Reopen and verify
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-        let reopenedGroup = try await reopenedFile.openGroup("data")
+        try await hdf5.closeGroup(subgroup)
+        try await hdf5.closeGroup(group)
+        try await hdf5.closeFile(file)
+
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let reopenedGroup = try await hdf5.openGroup("data", in: reopenedFile)
         #expect(reopenedGroup.name == "data")
 
-        // Clean up
+        try await hdf5.closeGroup(reopenedGroup)
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -64,33 +63,36 @@ struct SwiftHDF5Tests {
     func testDatasetIntegerOperations() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_dataset_int.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
-
-        // Create a 1D dataset
-        let dims: [hsize_t] = [10]
-        let dataspace = try await HDF5Dataspace(dimensions: dims)
-        let dataset = try await file.createDataset(
+        let file = try await hdf5.createFile(testFile)
+        let dataspace = try await hdf5.createDataspace(dimensions: [10])
+        let dataset = try await hdf5.createDataset(
             "integers",
+            in: file,
             datatype: HDF5Datatype.int32,
             dataspace: dataspace
         )
+        await hdf5.closeDataspace(dataspace)
 
-        // Write data
         let data: [Int32] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-        try await dataset.write(data)
+        try await hdf5.writeDataset(dataset, data: data)
+        try await hdf5.closeDataset(dataset)
+        try await hdf5.closeFile(file)
 
-        // Reopen and read
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-        let reopenedDataset = try await reopenedFile.openDataset("integers")
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let reopenedDataset = try await hdf5.openDataset("integers", in: reopenedFile)
 
-        let readData: [Int32] = try await reopenedDataset.read()
+        let readData: [Int32] = try await hdf5.readDataset(reopenedDataset)
         #expect(readData == data)
 
-        // Clean up
+        // Also test read(into:)
+        var preallocated = [Int32](repeating: 0, count: 10)
+        preallocated = try await hdf5.readDataset(reopenedDataset, into: preallocated)
+        #expect(preallocated == data)
+
+        try await hdf5.closeDataset(reopenedDataset)
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -98,34 +100,32 @@ struct SwiftHDF5Tests {
     func testDatasetDoubleOperations() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_dataset_double.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
-
-        // Create a 1D dataset
-        let dims: [hsize_t] = [5]
-        let dataspace = try await HDF5Dataspace(dimensions: dims)
-        let dataset = try await file.createDataset(
+        let file = try await hdf5.createFile(testFile)
+        let dataspace = try await hdf5.createDataspace(dimensions: [5])
+        let dataset = try await hdf5.createDataset(
             "temperatures",
+            in: file,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
+        await hdf5.closeDataspace(dataspace)
 
-        // Write data
         let data: [Double] = [20.5, 21.3, 19.8, 22.1, 20.9]
-        try await dataset.write(data)
+        try await hdf5.writeDataset(dataset, data: data)
+        try await hdf5.closeDataset(dataset)
+        try await hdf5.closeFile(file)
 
-        // Reopen and read
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-        let reopenedDataset = try await reopenedFile.openDataset("temperatures")
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let reopenedDataset = try await hdf5.openDataset("temperatures", in: reopenedFile)
 
-        let readData: [Double] = try await reopenedDataset.read()
+        let readData: [Double] = try await hdf5.readDataset(reopenedDataset)
         #expect(readData.count == 5)
         #expect(abs(readData[0] - 20.5) < 0.001)
 
-        // Clean up
+        try await hdf5.closeDataset(reopenedDataset)
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -133,44 +133,44 @@ struct SwiftHDF5Tests {
     func testTwoDimensionalDataset() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_2d_dataset.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
-
-        // Create a 2D dataset (3x4 matrix)
-        let dims: [hsize_t] = [3, 4]
-        let dataspace = try await HDF5Dataspace(dimensions: dims)
-        let dataset = try await file.createDataset(
+        let file = try await hdf5.createFile(testFile)
+        let dataspace = try await hdf5.createDataspace(dimensions: [3, 4])
+        let dataset = try await hdf5.createDataset(
             "matrix",
+            in: file,
             datatype: HDF5Datatype.float,
             dataspace: dataspace
         )
+        await hdf5.closeDataspace(dataspace)
 
-        // Write data (row-major order)
         let data: [Float] = [
             1.0, 2.0, 3.0, 4.0,
             5.0, 6.0, 7.0, 8.0,
             9.0, 10.0, 11.0, 12.0,
         ]
-        try await dataset.write(data)
+        try await hdf5.writeDataset(dataset, data: data)
+        try await hdf5.closeDataset(dataset)
+        try await hdf5.closeFile(file)
 
-        // Reopen and read
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-        let reopenedDataset = try await reopenedFile.openDataset("matrix")
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let reopenedDataset = try await hdf5.openDataset("matrix", in: reopenedFile)
 
-        let space = try await reopenedDataset.getSpace()
-        let readDims = try await space.getDimensions()
+        let space = try await hdf5.getDatasetSpace(reopenedDataset)
+        let readDims = try await hdf5.getDimensions(space)
         #expect(readDims.count == 2)
         #expect(readDims[0] == 3)
         #expect(readDims[1] == 4)
+        await hdf5.closeDataspace(space)
 
-        let readData: [Float] = try await reopenedDataset.read()
+        var readData = [Float](repeating: 0, count: 12)
+        readData = try await hdf5.readDataset(reopenedDataset, into: readData)
         #expect(readData.count == 12)
         #expect(abs(readData[5] - 6.0) < 0.001)
 
-        // Clean up
+        try await hdf5.closeDataset(reopenedDataset)
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -180,26 +180,20 @@ struct SwiftHDF5Tests {
     func testFileAttributes() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_file_attrs.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
+        let file = try await hdf5.createFile(testFile)
+        try await hdf5.writeAttribute("version", on: file, value: Int32(1), datatype: HDF5Datatype.int32)
+        try await hdf5.writeAttribute("temperature", on: file, value: Double(25.5), datatype: HDF5Datatype.double)
+        try await hdf5.closeFile(file)
 
-        // Write attributes
-        try await file.writeAttribute("version", value: Int32(1), datatype: HDF5Datatype.int32)
-        try await file.writeAttribute("temperature", value: Double(25.5), datatype: HDF5Datatype.double)
-
-        // Reopen and read attributes
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-
-        let version: Int32 = try await reopenedFile.readAttribute("version")
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let version: Int32 = try await hdf5.readAttribute("version", from: reopenedFile)
         #expect(version == 1)
-
-        let temperature: Double = try await reopenedFile.readAttribute("temperature")
+        let temperature: Double = try await hdf5.readAttribute("temperature", from: reopenedFile)
         #expect(abs(temperature - 25.5) < 0.001)
 
-        // Clean up
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -207,36 +201,33 @@ struct SwiftHDF5Tests {
     func testDatasetAttributes() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_dataset_attrs.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
-
-        // Create a dataset
-        let dims: [hsize_t] = [5]
-        let dataspace = try await HDF5Dataspace(dimensions: dims)
-        let dataset = try await file.createDataset(
+        let file = try await hdf5.createFile(testFile)
+        let dataspace = try await hdf5.createDataspace(dimensions: [5])
+        let dataset = try await hdf5.createDataset(
             "data",
+            in: file,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
+        await hdf5.closeDataspace(dataspace)
 
-        // Write attributes to the dataset
-        try await dataset.writeAttribute("units", value: Int32(42), datatype: HDF5Datatype.int32)
-        try await dataset.writeAttribute("scale", value: Double(1.5), datatype: HDF5Datatype.double)
+        try await hdf5.writeAttribute("units", on: dataset, value: Int32(42), datatype: HDF5Datatype.int32)
+        try await hdf5.writeAttribute("scale", on: dataset, value: Double(1.5), datatype: HDF5Datatype.double)
+        try await hdf5.closeDataset(dataset)
+        try await hdf5.closeFile(file)
 
-        // Reopen and read attributes
-        let reopenedFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
-        let reopenedDataset = try await reopenedFile.openDataset("data")
+        let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let reopenedDataset = try await hdf5.openDataset("data", in: reopenedFile)
 
-        let units: Int32 = try await reopenedDataset.readAttribute("units")
+        let units: Int32 = try await hdf5.readAttribute("units", from: reopenedDataset)
         #expect(units == 42)
-
-        let scale: Double = try await reopenedDataset.readAttribute("scale")
+        let scale: Double = try await hdf5.readAttribute("scale", from: reopenedDataset)
         #expect(abs(scale - 1.5) < 0.001)
 
-        // Clean up
+        try await hdf5.closeDataset(reopenedDataset)
+        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -246,58 +237,55 @@ struct SwiftHDF5Tests {
     func testCompleteWorkflow() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_workflow.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        // Create file
-        let file = try await SwiftHDF.create(file: testFile)
+        let file = try await hdf5.createFile(testFile)
+        try await hdf5.writeAttribute("experiment", on: file, value: Int32(123), datatype: HDF5Datatype.int32)
 
-        // Add file-level metadata
-        try await file.writeAttribute("experiment", value: Int32(123), datatype: HDF5Datatype.int32)
+        let resultsGroup = try await hdf5.createGroup("results", in: file)
+        let dataGroup = try await hdf5.createGroup("data", in: resultsGroup)
 
-        // Create groups
-        let resultsGroup = try await file.createGroup("results")
-        let dataGroup = try await resultsGroup.createGroup("data")
-
-        // Create dataset in nested group
-        let dims: [hsize_t] = [100]
-        let dataspace = try await HDF5Dataspace(dimensions: dims)
-        let dataset = try await dataGroup.createDataset(
+        let dataspace = try await hdf5.createDataspace(dimensions: [100])
+        let dataset = try await hdf5.createDataset(
             "measurements",
+            in: dataGroup,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
+        await hdf5.closeDataspace(dataspace)
 
-        // Generate and write data
         var measurements = [Double](repeating: 0, count: 100)
-        for i in 0..<100 {
-            measurements[i] = Double(i) * 0.5
-        }
-        try await dataset.write(measurements)
+        for i in 0..<100 { measurements[i] = Double(i) * 0.5 }
+        try await hdf5.writeDataset(dataset, data: measurements)
 
-        // Add metadata to dataset
-        try await dataset.writeAttribute("sensor_id", value: Int32(7), datatype: HDF5Datatype.int32)
-        try await dataset.writeAttribute("calibration", value: Double(1.0), datatype: HDF5Datatype.double)
+        try await hdf5.writeAttribute("sensor_id", on: dataset, value: Int32(7), datatype: HDF5Datatype.int32)
+        try await hdf5.writeAttribute("calibration", on: dataset, value: Double(1.0), datatype: HDF5Datatype.double)
 
-        // Verify the structure
-        let readFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
+        try await hdf5.closeDataset(dataset)
+        try await hdf5.closeGroup(dataGroup)
+        try await hdf5.closeGroup(resultsGroup)
+        try await hdf5.closeFile(file)
 
-        let expId: Int32 = try await readFile.readAttribute("experiment")
+        let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let expId: Int32 = try await hdf5.readAttribute("experiment", from: readFile)
         #expect(expId == 123)
 
-        let readResultsGroup = try await readFile.openGroup("results")
-        let readDataGroup = try await readResultsGroup.openGroup("data")
-        let readDataset = try await readDataGroup.openDataset("measurements")
+        let readResultsGroup = try await hdf5.openGroup("results", in: readFile)
+        let readDataGroup = try await hdf5.openGroup("data", in: readResultsGroup)
+        let readDataset = try await hdf5.openDataset("measurements", in: readDataGroup)
 
-        let sensorId: Int32 = try await readDataset.readAttribute("sensor_id")
+        let sensorId: Int32 = try await hdf5.readAttribute("sensor_id", from: readDataset)
         #expect(sensorId == 7)
 
-        let readMeasurements: [Double] = try await readDataset.read()
+        var readMeasurements = [Double](repeating: 0, count: 100)
+        readMeasurements = try await hdf5.readDataset(readDataset, into: readMeasurements)
         #expect(readMeasurements.count == 100)
         #expect(abs(readMeasurements[50] - 25.0) < 0.001)
 
-        // Clean up
+        try await hdf5.closeDataset(readDataset)
+        try await hdf5.closeGroup(readDataGroup)
+        try await hdf5.closeGroup(readResultsGroup)
+        try await hdf5.closeFile(readFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -307,50 +295,83 @@ struct SwiftHDF5Tests {
     func testNativeDatatypes() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let testFile = tempDir.appendingPathComponent("test_datatypes.h5").path
-
-        // Clean up if exists
         try? FileManager.default.removeItem(atPath: testFile)
 
-        let file = try await SwiftHDF.create(file: testFile)
+        let file = try await hdf5.createFile(testFile)
 
-        // Test Int8
-        let space8 = try await HDF5Dataspace(dimensions: [3])
-        let ds8 = try await file.createDataset(
-            "int8_data",
-            datatype: HDF5Datatype.int8,
-            dataspace: space8
-        )
-        let data8: [Int8] = [1, 2, 3]
-        try await ds8.write(data8)
+        let space8 = try await hdf5.createDataspace(dimensions: [3])
+        let ds8 = try await hdf5.createDataset("int8_data", in: file, datatype: HDF5Datatype.int8, dataspace: space8)
+        await hdf5.closeDataspace(space8)
+        try await hdf5.writeDataset(ds8, data: [Int8(1), Int8(2), Int8(3)])
+        try await hdf5.closeDataset(ds8)
 
-        // Test UInt16
-        let space16 = try await HDF5Dataspace(dimensions: [2])
-        let ds16 = try await file.createDataset(
+        let space16 = try await hdf5.createDataspace(dimensions: [2])
+        let ds16 = try await hdf5.createDataset(
             "uint16_data",
+            in: file,
             datatype: HDF5Datatype.uint16,
             dataspace: space16
         )
-        let data16: [UInt16] = [100, 200]
-        try await ds16.write(data16)
+        await hdf5.closeDataspace(space16)
+        try await hdf5.writeDataset(ds16, data: [UInt16(100), UInt16(200)])
+        try await hdf5.closeDataset(ds16)
 
-        // Test Int64
-        let space64 = try await HDF5Dataspace(dimensions: [4])
-        let ds64 = try await file.createDataset(
+        let space64 = try await hdf5.createDataspace(dimensions: [4])
+        let ds64 = try await hdf5.createDataset(
             "int64_data",
+            in: file,
             datatype: HDF5Datatype.int64,
             dataspace: space64
         )
-        let data64: [Int64] = [1000, 2000, 3000, 4000]
-        try await ds64.write(data64)
+        await hdf5.closeDataspace(space64)
+        try await hdf5.writeDataset(ds64, data: [Int64(1000), Int64(2000), Int64(3000), Int64(4000)])
+        try await hdf5.closeDataset(ds64)
 
-        // Verify
-        let readFile = try await SwiftHDF.open(file: testFile, mode: .readOnly)
+        try await hdf5.closeFile(file)
 
-        let readDs8 = try await readFile.openDataset("int8_data")
-        let read8: [Int8] = try await readDs8.read()
+        let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
+        let readDs8 = try await hdf5.openDataset("int8_data", in: readFile)
+        var read8 = [Int8](repeating: 0, count: 3)
+        read8 = try await hdf5.readDataset(readDs8, into: read8)
         #expect(read8 == [1, 2, 3])
 
-        // Clean up
+        try await hdf5.closeDataset(readDs8)
+        try await hdf5.closeFile(readFile)
         try? FileManager.default.removeItem(atPath: testFile)
+    }
+
+    @Test("HDF5 error stack may be corrupted across split await points (Thread Local Storage vulnerability)")
+    func testErrorStackCorruptionWithSplitAwait() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_tls_split.h5").path
+        try? FileManager.default.removeItem(atPath: testFile)
+        defer { try? FileManager.default.removeItem(atPath: testFile) }
+
+        let file = try await hdf5.createFile(testFile, mode: .truncate)
+
+        actor CorruptionActor {
+            var isCorrupted = false
+            func setCorrupted() {
+                self.isCorrupted = true
+            }
+        }
+        let corruptor = CorruptionActor()
+
+        for iteration in 0..<200 {
+            let group = try? await hdf5.openGroup("missing_\(iteration)", in: file)
+            if let group {
+                try await hdf5.closeGroup(group)
+            }
+            let errorMessage = await hdf5.readErrorStack()
+            let isMissing = errorMessage.contains("missing_\(iteration)")
+
+            if !isMissing {
+                await corruptor.setCorrupted()
+            }
+        }
+
+        try? await hdf5.closeFile(file)
+
+        #expect(await corruptor.isCorrupted == false)
     }
 }
