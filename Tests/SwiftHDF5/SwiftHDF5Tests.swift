@@ -59,9 +59,8 @@ struct SwiftHDF5Tests {
 
         let file = try await hdf5.createFile(testFile)
         let dataspace = try await hdf5.createDataspace(dimensions: [10])
-        let dataset = try await hdf5.createDataset(
+        let dataset = try await file.createDataset(
             "integers",
-            in: file,
             datatype: HDF5Datatype.int32,
             dataspace: dataspace
         )
@@ -69,7 +68,7 @@ struct SwiftHDF5Tests {
         try await hdf5.writeDataset(dataset, data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let reopenedDataset = try await hdf5.openDataset("integers", in: reopenedFile)
+        let reopenedDataset = try await reopenedFile.openDataset("integers")
 
         let readData: [Int32] = try await hdf5.readDataset(reopenedDataset)
         #expect(readData == data)
@@ -90,9 +89,8 @@ struct SwiftHDF5Tests {
 
         let file = try await hdf5.createFile(testFile)
         let dataspace = try await hdf5.createDataspace(dimensions: [5])
-        let dataset = try await hdf5.createDataset(
+        let dataset = try await file.createDataset(
             "temperatures",
-            in: file,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
@@ -101,7 +99,7 @@ struct SwiftHDF5Tests {
         try await hdf5.writeDataset(dataset, data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let reopenedDataset = try await hdf5.openDataset("temperatures", in: reopenedFile)
+        let reopenedDataset = try await reopenedFile.openDataset("temperatures")
 
         let readData: [Double] = try await hdf5.readDataset(reopenedDataset)
         #expect(readData.count == 5)
@@ -118,9 +116,8 @@ struct SwiftHDF5Tests {
 
         let file = try await hdf5.createFile(testFile)
         let dataspace = try await hdf5.createDataspace(dimensions: [3, 4])
-        let dataset = try await hdf5.createDataset(
+        let dataset = try await file.createDataset(
             "matrix",
-            in: file,
             datatype: HDF5Datatype.float,
             dataspace: dataspace
         )
@@ -132,7 +129,7 @@ struct SwiftHDF5Tests {
         try await hdf5.writeDataset(dataset, data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let reopenedDataset = try await hdf5.openDataset("matrix", in: reopenedFile)
+        let reopenedDataset = try await reopenedFile.openDataset("matrix")
 
         let space = try await hdf5.getDatasetSpace(reopenedDataset)
         let readDims = try await space.getDimensions()
@@ -177,9 +174,8 @@ struct SwiftHDF5Tests {
 
         let file = try await hdf5.createFile(testFile)
         let dataspace = try await hdf5.createDataspace(dimensions: [5])
-        let dataset = try await hdf5.createDataset(
+        let dataset = try await file.createDataset(
             "data",
-            in: file,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
@@ -188,7 +184,7 @@ struct SwiftHDF5Tests {
         try await hdf5.writeAttribute("scale", on: dataset, value: Double(1.5), datatype: HDF5Datatype.double)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let reopenedDataset = try await hdf5.openDataset("data", in: reopenedFile)
+        let reopenedDataset = try await reopenedFile.openDataset("data")
 
         let units: Int32 = try await hdf5.readAttribute("units", from: reopenedDataset)
         #expect(units == 42)
@@ -213,9 +209,8 @@ struct SwiftHDF5Tests {
         let dataGroup = try await resultsGroup.createGroup("data")
 
         let dataspace = try await hdf5.createDataspace(dimensions: [100])
-        let dataset = try await hdf5.createDataset(
+        let dataset = try await dataGroup.createDataset(
             "measurements",
-            in: dataGroup,
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
@@ -233,7 +228,7 @@ struct SwiftHDF5Tests {
 
         let readResultsGroup = try await readFile.openGroup("results")
         let readDataGroup = try await readResultsGroup.openGroup("data")
-        let readDataset = try await hdf5.openDataset("measurements", in: readDataGroup)
+        let readDataset = try await readDataGroup.openDataset("measurements")
 
         let sensorId: Int32 = try await hdf5.readAttribute("sensor_id", from: readDataset)
         #expect(sensorId == 7)
@@ -257,29 +252,27 @@ struct SwiftHDF5Tests {
         let file = try await hdf5.createFile(testFile)
 
         let space8 = try await hdf5.createDataspace(dimensions: [3])
-        let ds8 = try await hdf5.createDataset("int8_data", in: file, datatype: HDF5Datatype.int8, dataspace: space8)
+        let ds8 = try await file.createDataset("int8_data", datatype: HDF5Datatype.int8, dataspace: space8)
         try await hdf5.writeDataset(ds8, data: [Int8(1), Int8(2), Int8(3)])
 
         let space16 = try await hdf5.createDataspace(dimensions: [2])
-        let ds16 = try await hdf5.createDataset(
+        let ds16 = try await file.createDataset(
             "uint16_data",
-            in: file,
             datatype: HDF5Datatype.uint16,
             dataspace: space16
         )
         try await hdf5.writeDataset(ds16, data: [UInt16(100), UInt16(200)])
 
         let space64 = try await hdf5.createDataspace(dimensions: [4])
-        let ds64 = try await hdf5.createDataset(
+        let ds64 = try await file.createDataset(
             "int64_data",
-            in: file,
             datatype: HDF5Datatype.int64,
             dataspace: space64
         )
         try await hdf5.writeDataset(ds64, data: [Int64(1000), Int64(2000), Int64(3000), Int64(4000)])
 
         let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let readDs8 = try await hdf5.openDataset("int8_data", in: readFile)
+        let readDs8 = try await readFile.openDataset("int8_data")
         var read8 = [Int8](repeating: 0, count: 3)
         try await hdf5.readDataset(readDs8, into: &read8)
         #expect(read8 == [1, 2, 3])

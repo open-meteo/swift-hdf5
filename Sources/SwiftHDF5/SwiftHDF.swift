@@ -233,7 +233,7 @@ public actor HDF5 {
         return dims
     }
     
-    public func h5Sclose(_ id: hid_t) throws {
+    fileprivate func h5Sclose(_ id: hid_t) throws {
         guard H5Sclose(id) >= 0 else {
             throw HDF5Error.dataspaceCloseFailed
         }
@@ -241,35 +241,28 @@ public actor HDF5 {
 
     // MARK: - Dataset operations
 
-    public func createDataset(
-        _ name: String,
-        in parent: some HDF5Parent,
-        datatype: hid_t,
-        dataspace: HDF5DataspaceRef
-    ) throws -> HDF5DatasetRef {
+    fileprivate func h5Dcreate2(parent: hid_t, name: String, datatype: hid_t, dataspace: hid_t) throws -> hid_t {
         let datasetId = name.withCString {
             H5Dcreate2(
-                parent.parentId,
+                parent,
                 $0,
                 datatype,
-                dataspace.id,
+                dataspace,
                 hdf5_get_p_default(),
                 hdf5_get_p_default(),
                 hdf5_get_p_default()
             )
         }
         guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(name) }
-        let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
-        return HDF5DatasetRef(name: fullName, id: datasetId)
+        return datasetId
     }
-
-    public func openDataset(_ name: String, in parent: some HDF5Parent) throws -> HDF5DatasetRef {
+    
+    fileprivate func h5Dopen2(parent: hid_t, name: String) throws -> hid_t {
         let datasetId = name.withCString {
-            H5Dopen2(parent.parentId, $0, hdf5_get_p_default())
+            H5Dopen2(parent, $0, hdf5_get_p_default())
         }
         guard datasetId >= 0 else { throw HDF5Error.datasetOpenFailed(name) }
-        let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
-        return HDF5DatasetRef(name: fullName, id: datasetId)
+        return datasetId
     }
     
     public func h5Dclose(_ id: hid_t) throws {
@@ -450,6 +443,23 @@ extension HDF5Parent {
         let groupId = try await HDF5.shared.h5Gopen2(name, self.id)
         let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
         return HDF5GroupRef(name: fullName, id: groupId, fileId: parentFileId, parent: self)
+    }
+    
+    public func createDataset(
+        _ name: String,
+        datatype: hid_t,
+        dataspace: HDF5DataspaceRef
+    ) async throws -> HDF5DatasetRef {
+        let datasetId = try await HDF5.shared.h5Dcreate2(parent: self.id, name: name, datatype: datatype, dataspace: dataspace.id)
+        guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(name) }
+        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
+        return HDF5DatasetRef(name: fullName, id: datasetId)
+    }
+    
+    public func openDataset(_ name: String) async throws -> HDF5DatasetRef {
+        let datasetId = try await HDF5.shared.h5Dopen2(parent: id, name: name)
+        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
+        return HDF5DatasetRef(name: fullName, id: datasetId)
     }
 }
 
