@@ -25,6 +25,6 @@ extension HDF5Attributable {
     }
 }
 
-extension HDF5GroupRef: HDF5Attributable {}
-extension HDF5DatasetRef: HDF5Attributable {}
-extension HDF5DataspaceRef: HDF5Attributable {}
+extension HDF5Group: HDF5Attributable {}
+extension HDF5Dataset: HDF5Attributable {}
+extension HDF5Dataspace: HDF5Attributable {}

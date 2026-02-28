@@ -1,4 +1,5 @@
 import CHDF5
+import Foundation
 
 public enum FileAccessMode: Sendable {
     case readOnly
@@ -56,20 +57,20 @@ public actor HDF5 {
 
     // MARK: - File operations
 
-    public func createFile(_ path: String, mode: FileAccessMode = .truncate) throws -> HDF5FileRef {
+    public func createFile(_ path: String, mode: FileAccessMode = .truncate) throws -> HDF5File {
         let fileId = path.withCString { cPath in
             H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default())
         }
         guard fileId >= 0 else { throw HDF5Error.fileCreateFailed(path) }
-        return HDF5FileRef(id: fileId)
+        return HDF5File(id: fileId)
     }
 
-    public func openFile(_ path: String, mode: FileAccessMode = .readOnly) throws -> HDF5FileRef {
+    public func openFile(_ path: String, mode: FileAccessMode = .readOnly) throws -> HDF5File {
         let fileId = path.withCString { cPath in
             H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
         }
         guard fileId >= 0 else { throw HDF5Error.fileOpenFailed(path) }
-        return HDF5FileRef(id: fileId)
+        return HDF5File(id: fileId)
     }
     
     func h5Fclose(_ id: hid_t) throws {
@@ -110,12 +111,12 @@ public actor HDF5 {
 
     // MARK: - Dataspace operations
 
-    public func createDataspace(dimensions: [hsize_t]) throws -> HDF5DataspaceRef {
+    public func createDataspace(dimensions: [hsize_t]) throws -> HDF5Dataspace {
         let spaceId = dimensions.withUnsafeBufferPointer { ptr in
             H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
         }
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
-        return HDF5DataspaceRef(id: spaceId)
+        return HDF5Dataspace(id: spaceId)
     }
     
 //    fileprivate func h5Screate_simple(dimensions: [hsize_t]) -> hid_t {
@@ -300,7 +301,7 @@ public actor HDF5 {
         if T.self == String.self {
             let size = H5Tget_size(typeId)
             guard size > 0 else { return "" as! T }
-
+            // TODO: use String(unsafeUninitializedCapacity
             var buffer = [UInt8](repeating: 0, count: size)
             let res = buffer.withUnsafeMutableBufferPointer { ptr in
                 H5Aread(attrId, typeId, ptr.baseAddress)
@@ -325,6 +326,7 @@ public actor HDF5 {
     func h5Iget_name(id: hid_t) throws -> String {
         let size = H5Iget_name(id, nil, 0)
         guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get name size") }
+        // Capacity need to be +1 to accommodate the null terminator
         let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
             let result = H5Iget_name(id, ptr.baseAddress, ptr.count)
             guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get name") }
@@ -337,6 +339,7 @@ public actor HDF5 {
     func h5Fget_name(id: hid_t) throws -> String {
         let size = H5Fget_name(id, nil, 0)
         guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get file name size") }
+        // Capacity need to be +1 to accommodate the null terminator
         let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
             let result = H5Fget_name(id, ptr.baseAddress, ptr.count)
             guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get file name") }
