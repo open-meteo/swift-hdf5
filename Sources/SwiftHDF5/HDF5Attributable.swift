@@ -4,6 +4,10 @@ public protocol HDF5Attributable: Sendable {
 }
 
 extension HDF5Attributable {
+    public func getName() async throws -> String {
+        return try await HDF5.shared.h5Iget_name(id: id)
+    }
+    
     public func writeAttribute<T: Sendable>(
         _ name: String,
         value: T,

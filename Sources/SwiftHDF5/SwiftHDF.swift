@@ -84,7 +84,7 @@ public final class HDF5DatasetRef: Sendable {
     
     public func getDatasetSpace() async throws -> HDF5DataspaceRef {
         let spaceId = try await HDF5.shared.h5Dget_space(dataset: id)
-        return HDF5DataspaceRef(name: "", id: spaceId)
+        return HDF5DataspaceRef(id: spaceId)
     }
     
     deinit {
@@ -95,11 +95,9 @@ public final class HDF5DatasetRef: Sendable {
 }
 
 public final class HDF5DataspaceRef: Sendable {
-    public let name: String
     public let id: hid_t
     
-    init(name: String, id: hid_t) {
-        self.name = name
+    init(id: hid_t) {
         self.id = id
     }
     

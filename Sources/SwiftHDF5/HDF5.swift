@@ -321,4 +321,16 @@ public actor HDF5 {
             return buffer[0]
         }
     }
+    
+    func h5Iget_name(id: hid_t) throws -> String {
+        let size = H5Iget_name(id, nil, 0)
+        guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get name size") }
+        let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
+            let result = H5Iget_name(id, ptr.baseAddress, ptr.count)
+            guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get name") }
+            guard result == size else { throw HDF5Error.operationFailed("Failed to get name") }
+            return size
+        })
+        return name
+    }
 }
