@@ -36,14 +36,14 @@ struct SwiftHDF5Tests {
 
         let file = try await hdf5.createFile(testFile)
 
-        let group = try await hdf5.createGroup("data", in: file)
+        let group = try await file.createGroup("data")
         #expect(group.name == "data")
 
-        let subgroup = try await hdf5.createGroup("measurements", in: group)
+        let subgroup = try await group.createGroup("measurements")
         #expect(subgroup.name == "data/measurements")
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        let reopenedGroup = try await hdf5.openGroup("data", in: reopenedFile)
+        let reopenedGroup = try await reopenedFile.openGroup("data")
         #expect(reopenedGroup.name == "data")
 
         try? FileManager.default.removeItem(atPath: testFile)
@@ -209,8 +209,8 @@ struct SwiftHDF5Tests {
         let file = try await hdf5.createFile(testFile)
         try await hdf5.writeAttribute("experiment", on: file, value: Int32(123), datatype: HDF5Datatype.int32)
 
-        let resultsGroup = try await hdf5.createGroup("results", in: file)
-        let dataGroup = try await hdf5.createGroup("data", in: resultsGroup)
+        let resultsGroup = try await file.createGroup("results")
+        let dataGroup = try await resultsGroup.createGroup("data")
 
         let dataspace = try await hdf5.createDataspace(dimensions: [100])
         let dataset = try await hdf5.createDataset(
@@ -231,8 +231,8 @@ struct SwiftHDF5Tests {
         let expId: Int32 = try await hdf5.readAttribute("experiment", from: readFile)
         #expect(expId == 123)
 
-        let readResultsGroup = try await hdf5.openGroup("results", in: readFile)
-        let readDataGroup = try await hdf5.openGroup("data", in: readResultsGroup)
+        let readResultsGroup = try await readFile.openGroup("results")
+        let readDataGroup = try await readResultsGroup.openGroup("data")
         let readDataset = try await hdf5.openDataset("measurements", in: readDataGroup)
 
         let sensorId: Int32 = try await hdf5.readAttribute("sensor_id", from: readDataset)

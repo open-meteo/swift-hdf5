@@ -63,11 +63,13 @@ public final class HDF5GroupRef: Sendable {
     public let name: String
     public let id: hid_t
     public let fileId: hid_t
+    public let parent: HDF5Parent
     
-    init(name: String, id: hid_t, fileId: hid_t) {
+    init(name: String, id: hid_t, fileId: hid_t, parent: some HDF5Parent) {
         self.name = name
         self.id = id
         self.fileId = fileId
+        self.parent = parent
     }
     
     deinit {
@@ -170,11 +172,11 @@ public actor HDF5 {
     }
 
     // MARK: - Group operations
-
-    public func createGroup(_ name: String, in parent: some HDF5Parent) throws -> HDF5GroupRef {
+    
+    fileprivate func h5Gcreate2(_ name: String, _ parentId: hid_t) throws -> hid_t {
         let groupId = name.withCString {
             H5Gcreate2(
-                parent.parentId,
+                parentId,
                 $0,
                 hdf5_get_p_default(),
                 hdf5_get_p_default(),
@@ -182,17 +184,15 @@ public actor HDF5 {
             )
         }
         guard groupId >= 0 else { throw HDF5Error.groupCreateFailed(name) }
-        let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
-        return HDF5GroupRef(name: fullName, id: groupId, fileId: parent.parentFileId)
+        return groupId
     }
-
-    public func openGroup(_ name: String, in parent: some HDF5Parent) throws -> HDF5GroupRef {
+    
+    fileprivate func h5Gopen2(_ name: String, _ parentId: hid_t) throws -> hid_t {
         let groupId = name.withCString {
-            H5Gopen2(parent.parentId, $0, hdf5_get_p_default())
+            H5Gopen2(parentId, $0, hdf5_get_p_default())
         }
         guard groupId >= 0 else { throw HDF5Error.groupOpenFailed(name) }
-        let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
-        return HDF5GroupRef(name: fullName, id: groupId, fileId: parent.parentFileId)
+        return groupId
     }
     
     public func h5Gclose(_ id: hid_t) throws {
@@ -427,6 +427,20 @@ public protocol HDF5Parent: HDF5Identifiable {
     var parentId: hid_t { get }
     var parentName: String { get }
     var parentFileId: hid_t { get }
+}
+
+extension HDF5Parent {
+    public func createGroup(_ name: String) async throws -> HDF5GroupRef {
+        let groupId = try await HDF5.shared.h5Gcreate2(name, self.id)
+        let fullName = self.parentName.isEmpty ? name : "\(self.parentName)/\(name)"
+        return HDF5GroupRef(name: fullName, id: groupId, fileId: parentFileId, parent: self)
+    }
+    
+    public func openGroup(_ name: String) async throws -> HDF5GroupRef {
+        let groupId = try await HDF5.shared.h5Gopen2(name, self.id)
+        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
+        return HDF5GroupRef(name: fullName, id: groupId, fileId: parentFileId, parent: self)
+    }
 }
 
 extension HDF5FileRef: HDF5Identifiable, HDF5Parent {
