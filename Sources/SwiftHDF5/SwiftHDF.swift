@@ -104,6 +104,10 @@ public final class HDF5DataspaceRef: Sendable {
         self.id = id
     }
     
+    public func getDimensions() async throws -> [hsize_t] {
+        return try await HDF5.shared.h5Sget_simple_extent_dims(space_id: id)
+    }
+    
     deinit {
         Task { [id] in
             try? await HDF5.shared.h5Sclose(id)
@@ -195,7 +199,7 @@ public actor HDF5 {
         return groupId
     }
     
-    public func h5Gclose(_ id: hid_t) throws {
+    fileprivate func h5Gclose(_ id: hid_t) throws {
         guard H5Gclose(id) >= 0 else {
             throw HDF5Error.groupCloseFailed
         }
@@ -211,22 +215,28 @@ public actor HDF5 {
         return HDF5DataspaceRef(name: "", id: spaceId)
     }
     
-    public func h5Sclose(_ id: hid_t) throws {
-        guard H5Sclose(id) >= 0 else {
-            throw HDF5Error.dataspaceCloseFailed
-        }
-    }
-
-    public func getDimensions(_ space: HDF5DataspaceRef) throws -> [hsize_t] {
-        let ndims = H5Sget_simple_extent_ndims(space.id)
+//    fileprivate func h5Screate_simple(dimensions: [hsize_t]) -> hid_t {
+//        return dimensions.withUnsafeBufferPointer { ptr in
+//            H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
+//        }
+//    }
+    
+    fileprivate func h5Sget_simple_extent_dims(space_id: hid_t) throws -> [hsize_t]  {
+        let ndims = H5Sget_simple_extent_ndims(space_id)
         guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
 
         var dims = [hsize_t](repeating: 0, count: Int(ndims))
         let res = dims.withUnsafeMutableBufferPointer { ptr in
-            H5Sget_simple_extent_dims(space.id, ptr.baseAddress, nil)
+            H5Sget_simple_extent_dims(space_id, ptr.baseAddress, nil)
         }
         guard res >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
         return dims
+    }
+    
+    public func h5Sclose(_ id: hid_t) throws {
+        guard H5Sclose(id) >= 0 else {
+            throw HDF5Error.dataspaceCloseFailed
+        }
     }
 
     // MARK: - Dataset operations

@@ -135,7 +135,7 @@ struct SwiftHDF5Tests {
         let reopenedDataset = try await hdf5.openDataset("matrix", in: reopenedFile)
 
         let space = try await hdf5.getDatasetSpace(reopenedDataset)
-        let readDims = try await hdf5.getDimensions(space)
+        let readDims = try await space.getDimensions()
         #expect(readDims.count == 2)
         #expect(readDims[0] == 3)
         #expect(readDims[1] == 4)
