@@ -8,8 +8,6 @@ public final class HDF5File: Sendable {
     }
     
     deinit {
-        Task { [id] in
-            try? await HDF5.shared.h5Fclose(id)
-        }
+        try? HDF5.h5Fclose(id)
     }
 }

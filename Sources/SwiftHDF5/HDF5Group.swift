@@ -9,8 +9,6 @@ public final class HDF5Group: Sendable {
     }
     
     deinit {
-        Task { [id] in
-            try? await HDF5.shared.h5Gclose(id)
-        }
+        try? HDF5.h5Gclose(id)
     }
 }

@@ -35,85 +35,105 @@ public struct HDF5Datatype {
     public static var char: hid_t { hdf5_get_native_char() }
 }
 
-// MARK: - The single actor that serializes ALL HDF5 C calls
 
-public actor HDF5 {
-    /// Single gateway to all HDF5 C API calls.
-    ///
-    /// There must only ever be one instance of this actor in the process.
-    /// HDF5's C library maintains global internal state and is not thread-safe.
-    /// All calls are serialised through this actor's executor. Creating a second
-    /// instance would allow two threads to call into the C library concurrently,
-    /// which causes crashes and data corruption.
-    public static let shared = HDF5()
+// MARK: - Serializes ALL HDF5 C calls on a single background thread to ensure thread safety
 
-    private init() {
-        H5open()
+public enum HDF5 {
+    private static let queue = DispatchQueue(
+        label: "SwiftHDF5.single-thread"
+    )
+
+    private static func execute<T: Sendable>(_ work: @escaping @Sendable () -> sending T) async -> sending T {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                let result = work()
+                continuation.resume(returning: result)
+            }
+        }
     }
     
-    deinit {
-        H5close()
+    static func execute<T: Sendable>(_ work: @escaping @Sendable () throws -> sending T) async throws -> sending T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    let result = try work()
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     // MARK: - File operations
 
-    public func createFile(_ path: String, mode: FileAccessMode = .truncate) throws -> HDF5File {
-        let fileId = path.withCString { cPath in
-            H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default())
+    static public func createFile(_ path: String, mode: FileAccessMode = .truncate) async throws -> HDF5File {
+        let fileId = await execute {
+            path.withCString { cPath in
+                H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default())
+            }
         }
         guard fileId >= 0 else { throw HDF5Error.fileCreateFailed(path) }
         return HDF5File(id: fileId)
     }
 
-    public func openFile(_ path: String, mode: FileAccessMode = .readOnly) throws -> HDF5File {
-        let fileId = path.withCString { cPath in
-            H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
+    static public func openFile(_ path: String, mode: FileAccessMode = .readOnly) async throws -> HDF5File {
+        let fileId = await execute {
+            path.withCString { cPath in
+                H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
+            }
         }
         guard fileId >= 0 else { throw HDF5Error.fileOpenFailed(path) }
         return HDF5File(id: fileId)
     }
     
-    func h5Fclose(_ id: hid_t) throws {
-        guard H5Fclose(id) >= 0 else {
+    static func h5Fclose(_ id: hid_t) throws {
+        guard queue.sync(execute: { H5Fclose(id) }) >= 0 else {
             throw HDF5Error.fileCloseFailed
         }
     }
 
     // MARK: - Group operations
     
-    func h5Gcreate2(_ name: String, _ parentId: hid_t) throws -> hid_t {
-        let groupId = name.withCString {
-            H5Gcreate2(
-                parentId,
-                $0,
-                hdf5_get_p_default(),
-                hdf5_get_p_default(),
-                hdf5_get_p_default()
-            )
+    static func h5Gcreate2(_ name: String, _ parentId: hid_t) async throws -> hid_t {
+        let groupId = await execute {
+            name.withCString {
+                H5Gcreate2(
+                    parentId,
+                    $0,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
+            }
         }
         guard groupId >= 0 else { throw HDF5Error.groupCreateFailed(name) }
         return groupId
     }
     
-    func h5Gopen2(_ name: String, _ parentId: hid_t) throws -> hid_t {
-        let groupId = name.withCString {
-            H5Gopen2(parentId, $0, hdf5_get_p_default())
+    static func h5Gopen2(_ name: String, _ parentId: hid_t) async throws -> hid_t {
+        let groupId = await execute {
+            name.withCString {
+                H5Gopen2(parentId, $0, hdf5_get_p_default())
+            }
         }
         guard groupId >= 0 else { throw HDF5Error.groupOpenFailed(name) }
         return groupId
     }
     
-    func h5Gclose(_ id: hid_t) throws {
-        guard H5Gclose(id) >= 0 else {
+    static func h5Gclose(_ id: hid_t) throws {
+        guard queue.sync(execute: { H5Gclose(id) }) >= 0 else {
             throw HDF5Error.groupCloseFailed
         }
     }
 
     // MARK: - Dataspace operations
 
-    public func createDataspace(dimensions: [hsize_t]) throws -> HDF5Dataspace {
-        let spaceId = dimensions.withUnsafeBufferPointer { ptr in
-            H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
+    static public func createDataspace(dimensions: [hsize_t]) async throws -> HDF5Dataspace {
+        let spaceId = await execute {
+            dimensions.withUnsafeBufferPointer { ptr in
+                H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
+            }
         }
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
         return HDF5Dataspace(id: spaceId)
@@ -125,227 +145,248 @@ public actor HDF5 {
 //        }
 //    }
     
-    func h5Sget_simple_extent_dims(space_id: hid_t) throws -> [hsize_t]  {
-        let ndims = H5Sget_simple_extent_ndims(space_id)
-        guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
-
-        var dims = [hsize_t](repeating: 0, count: Int(ndims))
-        let res = dims.withUnsafeMutableBufferPointer { ptr in
-            H5Sget_simple_extent_dims(space_id, ptr.baseAddress, nil)
+    static func h5Sget_simple_extent_dims(space_id: hid_t) async throws -> [hsize_t]  {
+        return try await execute {
+            let ndims = H5Sget_simple_extent_ndims(space_id)
+            guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
+            
+            var dims = [hsize_t](repeating: 0, count: Int(ndims))
+            let res = dims.withUnsafeMutableBufferPointer { ptr in
+                H5Sget_simple_extent_dims(space_id, ptr.baseAddress, nil)
+            }
+            guard res >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
+            return dims
         }
-        guard res >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
-        return dims
     }
     
-    func h5Sclose(_ id: hid_t) throws {
-        guard H5Sclose(id) >= 0 else {
+    static func h5Sclose(_ id: hid_t) throws {
+        guard queue.sync(execute: { H5Sclose(id) }) >= 0 else {
             throw HDF5Error.dataspaceCloseFailed
         }
     }
 
     // MARK: - Dataset operations
 
-    func h5Dcreate2(parent: hid_t, name: String, datatype: hid_t, dataspace: hid_t) throws -> hid_t {
-        let datasetId = name.withCString {
-            H5Dcreate2(
-                parent,
-                $0,
-                datatype,
-                dataspace,
-                hdf5_get_p_default(),
-                hdf5_get_p_default(),
-                hdf5_get_p_default()
-            )
+    static func h5Dcreate2(parent: hid_t, name: String, datatype: hid_t, dataspace: hid_t) async throws -> hid_t {
+        let datasetId = await execute {
+            name.withCString {
+                H5Dcreate2(
+                    parent,
+                    $0,
+                    datatype,
+                    dataspace,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
+            }
         }
         guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(name) }
         return datasetId
     }
     
-    func h5Dopen2(parent: hid_t, name: String) throws -> hid_t {
-        let datasetId = name.withCString {
-            H5Dopen2(parent, $0, hdf5_get_p_default())
+    static func h5Dopen2(parent: hid_t, name: String) async throws -> hid_t {
+        let datasetId = await execute {
+            name.withCString {
+                H5Dopen2(parent, $0, hdf5_get_p_default())
+            }
         }
         guard datasetId >= 0 else { throw HDF5Error.datasetOpenFailed(name) }
         return datasetId
     }
     
-    func h5Dclose(_ id: hid_t) throws {
-        guard H5Dclose(id) >= 0 else {
+    static func h5Dclose(_ id: hid_t) throws {
+        guard queue.sync(execute: { H5Dclose(id) }) >= 0 else {
             throw HDF5Error.datasetCloseFailed
         }
     }
     
-    func h5Dget_space(dataset: hid_t) throws -> hid_t {
-        let spaceId = H5Dget_space(dataset)
+    static func h5Dget_space(dataset: hid_t) async throws -> hid_t {
+        let spaceId = await execute { H5Dget_space(dataset) }
         guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
         return spaceId
     }
 
-    func h5Dwrite<T: Sendable>(dataset: hid_t, data: [T]) throws {
-        let typeId = H5Dget_type(dataset)
-        guard typeId >= 0 else { throw HDF5Error.invalidDataType }
-        defer { H5Tclose(typeId) }
-
-        let res = data.withUnsafeBufferPointer { ptr in
-            H5Dwrite(
-                dataset,
-                typeId,
-                hdf5_get_s_all(),
-                hdf5_get_s_all(),
-                hdf5_get_p_default(),
-                ptr.baseAddress
-            )
+    static func h5Dwrite<T: Sendable>(dataset: hid_t, data: [T]) async throws {
+        return try await execute {
+            let typeId = H5Dget_type(dataset)
+            guard typeId >= 0 else { throw HDF5Error.invalidDataType }
+            defer { H5Tclose(typeId) }
+            
+            let res = data.withUnsafeBufferPointer { ptr in
+                H5Dwrite(
+                    dataset,
+                    typeId,
+                    hdf5_get_s_all(),
+                    hdf5_get_s_all(),
+                    hdf5_get_p_default(),
+                    ptr.baseAddress
+                )
+            }
+            guard res >= 0 else { throw HDF5Error.datasetWriteFailed("") }
         }
-        guard res >= 0 else { throw HDF5Error.datasetWriteFailed("") }
     }
 
-    func readDataset<T: Numeric & Sendable>(_ dataset: hid_t) throws -> [T] {
-        let spaceId = H5Dget_space(dataset)
-        guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
-        defer { H5Sclose(spaceId) }
-
-        let ndims = H5Sget_simple_extent_ndims(spaceId)
-        guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
-
-        var dims = [hsize_t](repeating: 0, count: Int(ndims))
-        let dimRes = dims.withUnsafeMutableBufferPointer { ptr in
-            H5Sget_simple_extent_dims(spaceId, ptr.baseAddress, nil)
+    static func readDataset<T: Numeric & Sendable>(_ dataset: hid_t) async throws -> [T] {
+        return try await execute {
+            let spaceId = H5Dget_space(dataset)
+            guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
+            defer { H5Sclose(spaceId) }
+            
+            let ndims = H5Sget_simple_extent_ndims(spaceId)
+            guard ndims >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
+            
+            var dims = [hsize_t](repeating: 0, count: Int(ndims))
+            let dimRes = dims.withUnsafeMutableBufferPointer { ptr in
+                H5Sget_simple_extent_dims(spaceId, ptr.baseAddress, nil)
+            }
+            guard dimRes >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
+            
+            let count = dims.reduce(1, *)
+            var buffer = [T](repeating: 0, count: Int(count))
+            
+            let typeId = H5Dget_type(dataset)
+            guard typeId >= 0 else { throw HDF5Error.invalidDataType }
+            defer { H5Tclose(typeId) }
+            
+            let res = buffer.withUnsafeMutableBufferPointer { ptr in
+                H5Dread(
+                    dataset,
+                    typeId,
+                    hdf5_get_s_all(),
+                    hdf5_get_s_all(),
+                    hdf5_get_p_default(),
+                    ptr.baseAddress
+                )
+            }
+            guard res >= 0 else { throw HDF5Error.datasetReadFailed("dataset.name") }
+            return buffer
         }
-        guard dimRes >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
-
-        let count = dims.reduce(1, *)
-        var buffer = [T](repeating: 0, count: Int(count))
-
-        let typeId = H5Dget_type(dataset)
-        guard typeId >= 0 else { throw HDF5Error.invalidDataType }
-        defer { H5Tclose(typeId) }
-
-        let res = buffer.withUnsafeMutableBufferPointer { ptr in
-            H5Dread(
-                dataset,
-                typeId,
-                hdf5_get_s_all(),
-                hdf5_get_s_all(),
-                hdf5_get_p_default(),
-                ptr.baseAddress
-            )
-        }
-        guard res >= 0 else { throw HDF5Error.datasetReadFailed("dataset.name") }
-        return buffer
     }
-
-    func readDataset<T: Sendable>(
-        _ dataset: hid_t,
-        into buffer: inout [T]
-    ) throws {
-        let typeId = H5Dget_type(dataset)
-        guard typeId >= 0 else { throw HDF5Error.invalidDataType }
-        defer { H5Tclose(typeId) }
-
-        let res = buffer.withUnsafeMutableBufferPointer { ptr in
-            H5Dread(
-                dataset,
-                typeId,
-                hdf5_get_s_all(),
-                hdf5_get_s_all(),
-                hdf5_get_p_default(),
-                ptr.baseAddress
-            )
-        }
-        guard res >= 0 else { throw HDF5Error.datasetReadFailed("dataset.name") }
-    }
+//
+//    static func readDataset<T: Sendable>(
+//        _ dataset: hid_t,
+//        into buffer: inout [T]
+//    ) async throws {
+//        return try await execute {
+//            let typeId = H5Dget_type(dataset)
+//            guard typeId >= 0 else { throw HDF5Error.invalidDataType }
+//            defer { H5Tclose(typeId) }
+//            
+//            let res = buffer.withUnsafeMutableBufferPointer { ptr in
+//                H5Dread(
+//                    dataset,
+//                    typeId,
+//                    hdf5_get_s_all(),
+//                    hdf5_get_s_all(),
+//                    hdf5_get_p_default(),
+//                    ptr.baseAddress
+//                )
+//            }
+//            guard res >= 0 else { throw HDF5Error.datasetReadFailed("dataset.name") }
+//        }
+//    }
 
     // MARK: - Attribute operations
 
-    func writeAttribute<T: Sendable>(
+    static func writeAttribute<T: Sendable>(
         _ name: String,
         on object: hid_t,
         value: T,
         datatype: hid_t
-    ) throws {
-        let dataspaceId = H5Screate(hdf5_get_s_scalar())
-        guard dataspaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
-        defer { H5Sclose(dataspaceId) }
-
-        let attrId = name.withCString {
-            H5Acreate2(
-                object,
-                $0,
-                datatype,
-                dataspaceId,
-                hdf5_get_p_default(),
-                hdf5_get_p_default()
-            )
+    ) async throws {
+        try await execute {
+            let dataspaceId = H5Screate(hdf5_get_s_scalar())
+            guard dataspaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
+            defer { H5Sclose(dataspaceId) }
+            
+            let attrId = name.withCString {
+                H5Acreate2(
+                    object,
+                    $0,
+                    datatype,
+                    dataspaceId,
+                    hdf5_get_p_default(),
+                    hdf5_get_p_default()
+                )
+            }
+            guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
+            defer { H5Aclose(attrId) }
+            
+            var mutableValue = value
+            let res = withUnsafePointer(to: &mutableValue) { ptr in
+                H5Awrite(attrId, datatype, ptr)
+            }
+            guard res >= 0 else { throw HDF5Error.attributeWriteFailed(name) }
         }
-        guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
-        defer { H5Aclose(attrId) }
-
-        var mutableValue = value
-        let res = withUnsafePointer(to: &mutableValue) { ptr in
-            H5Awrite(attrId, datatype, ptr)
-        }
-        guard res >= 0 else { throw HDF5Error.attributeWriteFailed(name) }
     }
 
-    func readAttribute<T: Sendable>(_ name: String, from object: hid_t) throws -> T {
-        let attrId = name.withCString {
-            H5Aopen(object, $0, hdf5_get_p_default())
-        }
-        guard attrId >= 0 else { throw HDF5Error.attributeOpenFailed(name) }
-        defer { H5Aclose(attrId) }
-
-        let typeId = H5Aget_type(attrId)
-        guard typeId >= 0 else { throw HDF5Error.invalidDataType }
-        defer { H5Tclose(typeId) }
-
-        if T.self == String.self {
-            let size = H5Tget_size(typeId)
-            guard size > 0 else { return "" as! T }
-            // TODO: use String(unsafeUninitializedCapacity
-            var buffer = [UInt8](repeating: 0, count: size)
-            let res = buffer.withUnsafeMutableBufferPointer { ptr in
-                H5Aread(attrId, typeId, ptr.baseAddress)
+    static func readAttribute<T: Sendable>(_ name: String, from object: hid_t) async throws -> T {
+        return try await execute {
+            let attrId = name.withCString {
+                H5Aopen(object, $0, hdf5_get_p_default())
             }
-            guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
-
-            let len = buffer.firstIndex(of: 0) ?? buffer.count
-            let str =
+            guard attrId >= 0 else { throw HDF5Error.attributeOpenFailed(name) }
+            defer { H5Aclose(attrId) }
+            
+            let typeId = H5Aget_type(attrId)
+            guard typeId >= 0 else { throw HDF5Error.invalidDataType }
+            defer { H5Tclose(typeId) }
+            
+            if T.self == String.self {
+                let size = H5Tget_size(typeId)
+                guard size > 0 else { return "" as! T }
+                // TODO: use String(unsafeUninitializedCapacity
+                var buffer = [UInt8](repeating: 0, count: size)
+                let res = buffer.withUnsafeMutableBufferPointer { ptr in
+                    H5Aread(attrId, typeId, ptr.baseAddress)
+                }
+                guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
+                
+                let len = buffer.firstIndex(of: 0) ?? buffer.count
+                let str =
                 String(bytes: buffer[..<len], encoding: .utf8)?
-                .trimmingCharacters(in: .whitespaces) ?? ""
-            return str as! T
-        }
-
-        return try withUnsafeTemporaryAllocation(of: T.self, capacity: 1) { buffer -> T in
-            guard H5Aread(attrId, typeId, buffer.baseAddress) >= 0 else {
-                throw HDF5Error.attributeReadFailed(name)
+                    .trimmingCharacters(in: .whitespaces) ?? ""
+                return str as! T
             }
-            return buffer[0]
+            
+            return try withUnsafeTemporaryAllocation(of: T.self, capacity: 1) { buffer -> T in
+                guard H5Aread(attrId, typeId, buffer.baseAddress) >= 0 else {
+                    throw HDF5Error.attributeReadFailed(name)
+                }
+                return buffer[0]
+            }
         }
     }
     
-    func h5Iget_name(id: hid_t) throws -> String {
-        let size = H5Iget_name(id, nil, 0)
-        guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get name size") }
-        // Capacity need to be +1 to accommodate the null terminator
-        let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
-            let result = H5Iget_name(id, ptr.baseAddress, ptr.count)
-            guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get name") }
-            guard result == size else { throw HDF5Error.operationFailed("Failed to get name") }
-            return size
-        })
-        return name
+    static func h5Iget_name(id: hid_t) async throws -> String {
+        return try await execute {
+            let size = H5Iget_name(id, nil, 0)
+            guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get name size") }
+            // Capacity need to be +1 to accommodate the null terminator
+            let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
+                let result = H5Iget_name(id, ptr.baseAddress, ptr.count)
+                guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get name") }
+                guard result == size else { throw HDF5Error.operationFailed("Failed to get name") }
+                return size
+            })
+            return name
+        }
     }
     
-    func h5Fget_name(id: hid_t) throws -> String {
-        let size = H5Fget_name(id, nil, 0)
-        guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get file name size") }
-        // Capacity need to be +1 to accommodate the null terminator
-        let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
-            let result = H5Fget_name(id, ptr.baseAddress, ptr.count)
-            guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get file name") }
-            guard result == size else { throw HDF5Error.operationFailed("Failed to get file name") }
-            return size
-        })
-        return name
+    static func h5Fget_name(id: hid_t) async throws -> String {
+        return try await execute {
+            let size = H5Fget_name(id, nil, 0)
+            guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get file name size") }
+            // Capacity need to be +1 to accommodate the null terminator
+            let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
+                let result = H5Fget_name(id, ptr.baseAddress, ptr.count)
+                guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get file name") }
+                guard result == size else { throw HDF5Error.operationFailed("Failed to get file name") }
+                return size
+            })
+            return name
+        }
     }
 }
+
