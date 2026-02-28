@@ -8,6 +8,10 @@ extension HDF5Attributable {
         return try await HDF5.shared.h5Iget_name(id: id)
     }
     
+    public func getFileName() async throws -> String {
+        return try await HDF5.shared.h5Fget_name(id: id)
+    }
+    
     public func writeAttribute<T: Sendable>(
         _ name: String,
         value: T,

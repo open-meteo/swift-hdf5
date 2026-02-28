@@ -18,10 +18,10 @@ struct SwiftHDF5Tests {
         try? FileManager.default.removeItem(atPath: testFile)
 
         let file = try await hdf5.createFile(testFile, mode: .truncate)
-        #expect(file.path == testFile)
+        #expect(try await file.getFileName() == testFile)
 
         let openedFile = try await hdf5.openFile(testFile, mode: .readOnly)
-        #expect(openedFile.path == testFile)
+        #expect(try await openedFile.getFileName() == testFile)
 
         try? FileManager.default.removeItem(atPath: testFile)
     }

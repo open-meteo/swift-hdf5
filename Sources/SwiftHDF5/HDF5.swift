@@ -61,7 +61,7 @@ public actor HDF5 {
             H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default())
         }
         guard fileId >= 0 else { throw HDF5Error.fileCreateFailed(path) }
-        return HDF5FileRef(path: path, id: fileId)
+        return HDF5FileRef(id: fileId)
     }
 
     public func openFile(_ path: String, mode: FileAccessMode = .readOnly) throws -> HDF5FileRef {
@@ -69,7 +69,7 @@ public actor HDF5 {
             H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
         }
         guard fileId >= 0 else { throw HDF5Error.fileOpenFailed(path) }
-        return HDF5FileRef(path: path, id: fileId)
+        return HDF5FileRef(id: fileId)
     }
     
     func h5Fclose(_ id: hid_t) throws {
@@ -115,7 +115,7 @@ public actor HDF5 {
             H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
         }
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
-        return HDF5DataspaceRef(name: "", id: spaceId)
+        return HDF5DataspaceRef(id: spaceId)
     }
     
 //    fileprivate func h5Screate_simple(dimensions: [hsize_t]) -> hid_t {
@@ -329,6 +329,18 @@ public actor HDF5 {
             let result = H5Iget_name(id, ptr.baseAddress, ptr.count)
             guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get name") }
             guard result == size else { throw HDF5Error.operationFailed("Failed to get name") }
+            return size
+        })
+        return name
+    }
+    
+    func h5Fget_name(id: hid_t) throws -> String {
+        let size = H5Fget_name(id, nil, 0)
+        guard size >= 0 else { throw HDF5Error.operationFailed("Failed to get file name size") }
+        let name = try String(unsafeUninitializedCapacity: size+1, initializingUTF8With: { ptr in
+            let result = H5Fget_name(id, ptr.baseAddress, ptr.count)
+            guard result >= 0 else { throw HDF5Error.operationFailed("Failed to get file name") }
+            guard result == size else { throw HDF5Error.operationFailed("Failed to get file name") }
             return size
         })
         return name

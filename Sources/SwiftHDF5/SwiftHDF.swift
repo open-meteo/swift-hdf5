@@ -28,11 +28,9 @@ public enum HDF5Error: Error {
 
 
 public final class HDF5FileRef: Sendable {
-    public let path: String
     public let id: hid_t
     
-    init(path: String, id: hid_t) {
-        self.path = path
+    init(id: hid_t) {
         self.id = id
     }
     
