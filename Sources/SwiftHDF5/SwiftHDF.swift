@@ -44,15 +44,11 @@ public final class HDF5FileRef: Sendable {
 }
 
 public final class HDF5GroupRef: Sendable {
-    public let name: String
     public let id: hid_t
-    public let fileId: hid_t
-    public let parent: HDF5Parent
+    public let parent: HDF5FileOrGroup
     
-    init(name: String, id: hid_t, fileId: hid_t, parent: some HDF5Parent) {
-        self.name = name
+    init(id: hid_t, parent: some HDF5FileOrGroup) {
         self.id = id
-        self.fileId = fileId
         self.parent = parent
     }
     
@@ -64,12 +60,12 @@ public final class HDF5GroupRef: Sendable {
 }
 
 public final class HDF5DatasetRef: Sendable {
-    public let name: String
     public let id: hid_t
+    public let parent: HDF5FileOrGroup
     
-    init(name: String, id: hid_t) {
-        self.name = name
+    init(id: hid_t, parent: HDF5FileOrGroup) {
         self.id = id
+        self.parent = parent
     }
     
     public func writeDataset<T: Sendable>(data: [T]) async throws {
@@ -118,28 +114,36 @@ public final class HDF5DataspaceRef: Sendable {
     }
 }
 
-
 // MARK: - Protocols for parent containers
 
-
-
-public protocol HDF5Parent: HDF5Attributable {
-    var parentId: hid_t { get }
-    var parentName: String { get }
-    var parentFileId: hid_t { get }
+extension HDF5FileRef: HDF5FileOrGroup {
+    public var parentFileOrGroup: (any HDF5FileOrGroup)? {
+        return nil
+    }
 }
 
-extension HDF5Parent {
+extension HDF5GroupRef: HDF5FileOrGroup {
+    public var parentFileOrGroup: (any HDF5FileOrGroup)? {
+        return self.parent
+    }
+}
+
+
+public protocol HDF5FileOrGroup: HDF5Attributable {
+    var id: hid_t { get }
+    var parentFileOrGroup: HDF5FileOrGroup? { get }
+}
+
+
+extension HDF5FileOrGroup {
     public func createGroup(_ name: String) async throws -> HDF5GroupRef {
         let groupId = try await HDF5.shared.h5Gcreate2(name, self.id)
-        let fullName = self.parentName.isEmpty ? name : "\(self.parentName)/\(name)"
-        return HDF5GroupRef(name: fullName, id: groupId, fileId: parentFileId, parent: self)
+        return HDF5GroupRef(id: groupId, parent: self)
     }
     
     public func openGroup(_ name: String) async throws -> HDF5GroupRef {
         let groupId = try await HDF5.shared.h5Gopen2(name, self.id)
-        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
-        return HDF5GroupRef(name: fullName, id: groupId, fileId: parentFileId, parent: self)
+        return HDF5GroupRef(id: groupId, parent: self)
     }
     
     public func createDataset(
@@ -149,14 +153,12 @@ extension HDF5Parent {
     ) async throws -> HDF5DatasetRef {
         let datasetId = try await HDF5.shared.h5Dcreate2(parent: self.id, name: name, datatype: datatype, dataspace: dataspace.id)
         guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(name) }
-        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
-        return HDF5DatasetRef(name: fullName, id: datasetId)
+        return HDF5DatasetRef(id: datasetId, parent: self)
     }
     
     public func openDataset(_ name: String) async throws -> HDF5DatasetRef {
         let datasetId = try await HDF5.shared.h5Dopen2(parent: id, name: name)
-        let fullName = parentName.isEmpty ? name : "\(parentName)/\(name)"
-        return HDF5DatasetRef(name: fullName, id: datasetId)
+        return HDF5DatasetRef(id: datasetId, parent: self)
     }
 }
 

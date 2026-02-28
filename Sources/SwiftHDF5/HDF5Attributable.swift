@@ -17,17 +17,6 @@ extension HDF5Attributable {
     }
 }
 
-extension HDF5FileRef: HDF5Attributable, HDF5Parent {
-    public var parentId: hid_t { self.id }
-    public var parentName: String { "" }
-    public var parentFileId: hid_t { self.id }
-}
-
-extension HDF5GroupRef: HDF5Attributable, HDF5Parent {
-    public var parentId: hid_t { self.id }
-    public var parentName: String { self.name }
-    public var parentFileId: hid_t { self.fileId }
-}
-
+extension HDF5GroupRef: HDF5Attributable {}
 extension HDF5DatasetRef: HDF5Attributable {}
 extension HDF5DataspaceRef: HDF5Attributable {}
