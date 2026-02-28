@@ -88,6 +88,15 @@ public final class HDF5DatasetRef: Sendable {
         self.id = id
     }
     
+    public func writeDataset<T: Sendable>(data: [T]) async throws {
+        try await HDF5.shared.h5Dwrite(dataset: self.id, data: data)
+    }
+    
+    public func getDatasetSpace() async throws -> HDF5DataspaceRef {
+        let spaceId = try await HDF5.shared.h5Dget_space(dataset: id)
+        return HDF5DataspaceRef(name: "", id: spaceId)
+    }
+    
     deinit {
         Task { [id] in
             try? await HDF5.shared.h5Dclose(id)
@@ -265,26 +274,26 @@ public actor HDF5 {
         return datasetId
     }
     
-    public func h5Dclose(_ id: hid_t) throws {
+    fileprivate func h5Dclose(_ id: hid_t) throws {
         guard H5Dclose(id) >= 0 else {
             throw HDF5Error.datasetCloseFailed
         }
     }
-
-    public func getDatasetSpace(_ dataset: HDF5DatasetRef) throws -> HDF5DataspaceRef {
-        let spaceId = H5Dget_space(dataset.id)
+    
+    fileprivate func h5Dget_space(dataset: hid_t) throws -> hid_t {
+        let spaceId = H5Dget_space(dataset)
         guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
-        return HDF5DataspaceRef(name: "", id: spaceId)
+        return spaceId
     }
 
-    public func writeDataset<T: Sendable>(_ dataset: HDF5DatasetRef, data: [T]) throws {
-        let typeId = H5Dget_type(dataset.id)
+    fileprivate func h5Dwrite<T: Sendable>(dataset: hid_t, data: [T]) throws {
+        let typeId = H5Dget_type(dataset)
         guard typeId >= 0 else { throw HDF5Error.invalidDataType }
         defer { H5Tclose(typeId) }
 
         let res = data.withUnsafeBufferPointer { ptr in
             H5Dwrite(
-                dataset.id,
+                dataset,
                 typeId,
                 hdf5_get_s_all(),
                 hdf5_get_s_all(),
@@ -292,7 +301,7 @@ public actor HDF5 {
                 ptr.baseAddress
             )
         }
-        guard res >= 0 else { throw HDF5Error.datasetWriteFailed(dataset.name) }
+        guard res >= 0 else { throw HDF5Error.datasetWriteFailed("") }
     }
 
     public func readDataset<T: Numeric & Sendable>(_ dataset: HDF5DatasetRef) throws -> [T] {

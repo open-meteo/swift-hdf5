@@ -65,7 +65,7 @@ struct SwiftHDF5Tests {
             dataspace: dataspace
         )
         let data: [Int32] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-        try await hdf5.writeDataset(dataset, data: data)
+        try await dataset.writeDataset(data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await reopenedFile.openDataset("integers")
@@ -96,7 +96,7 @@ struct SwiftHDF5Tests {
         )
 
         let data: [Double] = [20.5, 21.3, 19.8, 22.1, 20.9]
-        try await hdf5.writeDataset(dataset, data: data)
+        try await dataset.writeDataset(data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await reopenedFile.openDataset("temperatures")
@@ -126,12 +126,12 @@ struct SwiftHDF5Tests {
             5.0, 6.0, 7.0, 8.0,
             9.0, 10.0, 11.0, 12.0,
         ]
-        try await hdf5.writeDataset(dataset, data: data)
+        try await dataset.writeDataset(data: data)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await reopenedFile.openDataset("matrix")
 
-        let space = try await hdf5.getDatasetSpace(reopenedDataset)
+        let space = try await reopenedDataset.getDatasetSpace()
         let readDims = try await space.getDimensions()
         #expect(readDims.count == 2)
         #expect(readDims[0] == 3)
@@ -217,7 +217,7 @@ struct SwiftHDF5Tests {
 
         var measurements = [Double](repeating: 0, count: 100)
         for i in 0..<100 { measurements[i] = Double(i) * 0.5 }
-        try await hdf5.writeDataset(dataset, data: measurements)
+        try await dataset.writeDataset(data: measurements)
 
         try await hdf5.writeAttribute("sensor_id", on: dataset, value: Int32(7), datatype: HDF5Datatype.int32)
         try await hdf5.writeAttribute("calibration", on: dataset, value: Double(1.0), datatype: HDF5Datatype.double)
@@ -253,7 +253,7 @@ struct SwiftHDF5Tests {
 
         let space8 = try await hdf5.createDataspace(dimensions: [3])
         let ds8 = try await file.createDataset("int8_data", datatype: HDF5Datatype.int8, dataspace: space8)
-        try await hdf5.writeDataset(ds8, data: [Int8(1), Int8(2), Int8(3)])
+        try await ds8.writeDataset(data: [Int8(1), Int8(2), Int8(3)])
 
         let space16 = try await hdf5.createDataspace(dimensions: [2])
         let ds16 = try await file.createDataset(
@@ -261,7 +261,7 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.uint16,
             dataspace: space16
         )
-        try await hdf5.writeDataset(ds16, data: [UInt16(100), UInt16(200)])
+        try await ds16.writeDataset(data: [UInt16(100), UInt16(200)])
 
         let space64 = try await hdf5.createDataspace(dimensions: [4])
         let ds64 = try await file.createDataset(
@@ -269,7 +269,7 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.int64,
             dataspace: space64
         )
-        try await hdf5.writeDataset(ds64, data: [Int64(1000), Int64(2000), Int64(3000), Int64(4000)])
+        try await ds64.writeDataset(data: [Int64(1000), Int64(2000), Int64(3000), Int64(4000)])
 
         let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let readDs8 = try await readFile.openDataset("int8_data")
