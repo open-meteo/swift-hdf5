@@ -6,13 +6,17 @@ import Foundation
 public enum HDF5Error: Error {
     case fileOpenFailed(String)
     case fileCreateFailed(String)
+    case fileCloseFailed
     case groupOpenFailed(String)
     case groupCreateFailed(String)
+    case groupCloseFailed
     case datasetOpenFailed(String)
     case datasetCreateFailed(String)
     case datasetReadFailed(String)
     case datasetWriteFailed(String)
+    case datasetCloseFailed
     case dataspaceCreateFailed
+    case dataspaceCloseFailed
     case attributeOpenFailed(String)
     case attributeCreateFailed(String)
     case attributeReadFailed(String)
@@ -39,25 +43,70 @@ public enum FileAccessMode: Sendable {
     }
 }
 
-public struct HDF5FileRef: Sendable {
+public final class HDF5FileRef: Sendable {
     public let path: String
     public let id: hid_t
+    
+    init(path: String, id: hid_t) {
+        self.path = path
+        self.id = id
+    }
+    
+    deinit {
+        Task { [id] in
+            try? await HDF5.shared.h5Fclose(id)
+        }
+    }
 }
 
-public struct HDF5GroupRef: Sendable {
+public final class HDF5GroupRef: Sendable {
     public let name: String
     public let id: hid_t
     public let fileId: hid_t
+    
+    init(name: String, id: hid_t, fileId: hid_t) {
+        self.name = name
+        self.id = id
+        self.fileId = fileId
+    }
+    
+    deinit {
+        Task { [id] in
+            try? await HDF5.shared.h5Gclose(id)
+        }
+    }
 }
 
-public struct HDF5DatasetRef: Sendable {
+public final class HDF5DatasetRef: Sendable {
     public let name: String
     public let id: hid_t
+    
+    init(name: String, id: hid_t) {
+        self.name = name
+        self.id = id
+    }
+    
+    deinit {
+        Task { [id] in
+            try? await HDF5.shared.h5Dclose(id)
+        }
+    }
 }
 
-public struct HDF5DataspaceRef: Sendable {
+public final class HDF5DataspaceRef: Sendable {
     public let name: String
     public let id: hid_t
+    
+    init(name: String, id: hid_t) {
+        self.name = name
+        self.id = id
+    }
+    
+    deinit {
+        Task { [id] in
+            try? await HDF5.shared.h5Sclose(id)
+        }
+    }
 }
 
 // MARK: - HDF5 Datatype
@@ -91,6 +140,10 @@ public actor HDF5 {
     private init() {
         H5open()
     }
+    
+    deinit {
+        H5close()
+    }
 
     // MARK: - File operations
 
@@ -109,10 +162,10 @@ public actor HDF5 {
         guard fileId >= 0 else { throw HDF5Error.fileOpenFailed(path) }
         return HDF5FileRef(path: path, id: fileId)
     }
-
-    public func closeFile(_ file: consuming HDF5FileRef) throws {
-        guard H5Fclose(file.id) >= 0 else {
-            throw HDF5Error.operationFailed("Failed to close file: \(file.path)")
+    
+    fileprivate func h5Fclose(_ id: hid_t) throws {
+        guard H5Fclose(id) >= 0 else {
+            throw HDF5Error.fileCloseFailed
         }
     }
 
@@ -141,10 +194,10 @@ public actor HDF5 {
         let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
         return HDF5GroupRef(name: fullName, id: groupId, fileId: parent.parentFileId)
     }
-
-    public func closeGroup(_ group: consuming HDF5GroupRef) throws {
-        guard H5Gclose(group.id) >= 0 else {
-            throw HDF5Error.operationFailed("Failed to close group: \(group.name)")
+    
+    public func h5Gclose(_ id: hid_t) throws {
+        guard H5Gclose(id) >= 0 else {
+            throw HDF5Error.groupCloseFailed
         }
     }
 
@@ -157,9 +210,11 @@ public actor HDF5 {
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
         return HDF5DataspaceRef(name: "", id: spaceId)
     }
-
-    public func closeDataspace(_ space: HDF5DataspaceRef) {
-        H5Sclose(space.id)
+    
+    public func h5Sclose(_ id: hid_t) throws {
+        guard H5Sclose(id) >= 0 else {
+            throw HDF5Error.dataspaceCloseFailed
+        }
     }
 
     public func getDimensions(_ space: HDF5DataspaceRef) throws -> [hsize_t] {
@@ -206,10 +261,10 @@ public actor HDF5 {
         let fullName = parent.parentName.isEmpty ? name : "\(parent.parentName)/\(name)"
         return HDF5DatasetRef(name: fullName, id: datasetId)
     }
-
-    public func closeDataset(_ dataset: consuming HDF5DatasetRef) throws {
-        guard H5Dclose(dataset.id) >= 0 else {
-            throw HDF5Error.operationFailed("Failed to close dataset: \(dataset.name)")
+    
+    public func h5Dclose(_ id: hid_t) throws {
+        guard H5Dclose(id) >= 0 else {
+            throw HDF5Error.datasetCloseFailed
         }
     }
 

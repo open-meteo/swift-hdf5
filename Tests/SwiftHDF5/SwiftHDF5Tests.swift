@@ -23,8 +23,6 @@ struct SwiftHDF5Tests {
         let openedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         #expect(openedFile.path == testFile)
 
-        try await hdf5.closeFile(openedFile)
-        try await hdf5.closeFile(file)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -44,16 +42,10 @@ struct SwiftHDF5Tests {
         let subgroup = try await hdf5.createGroup("measurements", in: group)
         #expect(subgroup.name == "data/measurements")
 
-        try await hdf5.closeGroup(subgroup)
-        try await hdf5.closeGroup(group)
-        try await hdf5.closeFile(file)
-
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedGroup = try await hdf5.openGroup("data", in: reopenedFile)
         #expect(reopenedGroup.name == "data")
 
-        try await hdf5.closeGroup(reopenedGroup)
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -73,12 +65,8 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.int32,
             dataspace: dataspace
         )
-        await hdf5.closeDataspace(dataspace)
-
         let data: [Int32] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         try await hdf5.writeDataset(dataset, data: data)
-        try await hdf5.closeDataset(dataset)
-        try await hdf5.closeFile(file)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await hdf5.openDataset("integers", in: reopenedFile)
@@ -91,8 +79,6 @@ struct SwiftHDF5Tests {
         try await hdf5.readDataset(reopenedDataset, into: &preallocated)
         #expect(preallocated == data)
 
-        try await hdf5.closeDataset(reopenedDataset)
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -110,12 +96,9 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
-        await hdf5.closeDataspace(dataspace)
 
         let data: [Double] = [20.5, 21.3, 19.8, 22.1, 20.9]
         try await hdf5.writeDataset(dataset, data: data)
-        try await hdf5.closeDataset(dataset)
-        try await hdf5.closeFile(file)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await hdf5.openDataset("temperatures", in: reopenedFile)
@@ -124,8 +107,6 @@ struct SwiftHDF5Tests {
         #expect(readData.count == 5)
         #expect(abs(readData[0] - 20.5) < 0.001)
 
-        try await hdf5.closeDataset(reopenedDataset)
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -143,16 +124,12 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.float,
             dataspace: dataspace
         )
-        await hdf5.closeDataspace(dataspace)
-
         let data: [Float] = [
             1.0, 2.0, 3.0, 4.0,
             5.0, 6.0, 7.0, 8.0,
             9.0, 10.0, 11.0, 12.0,
         ]
         try await hdf5.writeDataset(dataset, data: data)
-        try await hdf5.closeDataset(dataset)
-        try await hdf5.closeFile(file)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await hdf5.openDataset("matrix", in: reopenedFile)
@@ -162,15 +139,12 @@ struct SwiftHDF5Tests {
         #expect(readDims.count == 2)
         #expect(readDims[0] == 3)
         #expect(readDims[1] == 4)
-        await hdf5.closeDataspace(space)
-
+        
         var readData = [Float](repeating: 0, count: 12)
         try await hdf5.readDataset(reopenedDataset, into: &readData)
         #expect(readData.count == 12)
         #expect(abs(readData[5] - 6.0) < 0.001)
 
-        try await hdf5.closeDataset(reopenedDataset)
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -185,7 +159,6 @@ struct SwiftHDF5Tests {
         let file = try await hdf5.createFile(testFile)
         try await hdf5.writeAttribute("version", on: file, value: Int32(1), datatype: HDF5Datatype.int32)
         try await hdf5.writeAttribute("temperature", on: file, value: Double(25.5), datatype: HDF5Datatype.double)
-        try await hdf5.closeFile(file)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let version: Int32 = try await hdf5.readAttribute("version", from: reopenedFile)
@@ -193,7 +166,6 @@ struct SwiftHDF5Tests {
         let temperature: Double = try await hdf5.readAttribute("temperature", from: reopenedFile)
         #expect(abs(temperature - 25.5) < 0.001)
 
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -211,12 +183,9 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
-        await hdf5.closeDataspace(dataspace)
 
         try await hdf5.writeAttribute("units", on: dataset, value: Int32(42), datatype: HDF5Datatype.int32)
         try await hdf5.writeAttribute("scale", on: dataset, value: Double(1.5), datatype: HDF5Datatype.double)
-        try await hdf5.closeDataset(dataset)
-        try await hdf5.closeFile(file)
 
         let reopenedFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await hdf5.openDataset("data", in: reopenedFile)
@@ -226,8 +195,6 @@ struct SwiftHDF5Tests {
         let scale: Double = try await hdf5.readAttribute("scale", from: reopenedDataset)
         #expect(abs(scale - 1.5) < 0.001)
 
-        try await hdf5.closeDataset(reopenedDataset)
-        try await hdf5.closeFile(reopenedFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -252,7 +219,6 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.double,
             dataspace: dataspace
         )
-        await hdf5.closeDataspace(dataspace)
 
         var measurements = [Double](repeating: 0, count: 100)
         for i in 0..<100 { measurements[i] = Double(i) * 0.5 }
@@ -260,11 +226,6 @@ struct SwiftHDF5Tests {
 
         try await hdf5.writeAttribute("sensor_id", on: dataset, value: Int32(7), datatype: HDF5Datatype.int32)
         try await hdf5.writeAttribute("calibration", on: dataset, value: Double(1.0), datatype: HDF5Datatype.double)
-
-        try await hdf5.closeDataset(dataset)
-        try await hdf5.closeGroup(dataGroup)
-        try await hdf5.closeGroup(resultsGroup)
-        try await hdf5.closeFile(file)
 
         let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let expId: Int32 = try await hdf5.readAttribute("experiment", from: readFile)
@@ -282,10 +243,6 @@ struct SwiftHDF5Tests {
         #expect(readMeasurements.count == 100)
         #expect(abs(readMeasurements[50] - 25.0) < 0.001)
 
-        try await hdf5.closeDataset(readDataset)
-        try await hdf5.closeGroup(readDataGroup)
-        try await hdf5.closeGroup(readResultsGroup)
-        try await hdf5.closeFile(readFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 
@@ -301,9 +258,7 @@ struct SwiftHDF5Tests {
 
         let space8 = try await hdf5.createDataspace(dimensions: [3])
         let ds8 = try await hdf5.createDataset("int8_data", in: file, datatype: HDF5Datatype.int8, dataspace: space8)
-        await hdf5.closeDataspace(space8)
         try await hdf5.writeDataset(ds8, data: [Int8(1), Int8(2), Int8(3)])
-        try await hdf5.closeDataset(ds8)
 
         let space16 = try await hdf5.createDataspace(dimensions: [2])
         let ds16 = try await hdf5.createDataset(
@@ -312,9 +267,7 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.uint16,
             dataspace: space16
         )
-        await hdf5.closeDataspace(space16)
         try await hdf5.writeDataset(ds16, data: [UInt16(100), UInt16(200)])
-        try await hdf5.closeDataset(ds16)
 
         let space64 = try await hdf5.createDataspace(dimensions: [4])
         let ds64 = try await hdf5.createDataset(
@@ -323,11 +276,7 @@ struct SwiftHDF5Tests {
             datatype: HDF5Datatype.int64,
             dataspace: space64
         )
-        await hdf5.closeDataspace(space64)
         try await hdf5.writeDataset(ds64, data: [Int64(1000), Int64(2000), Int64(3000), Int64(4000)])
-        try await hdf5.closeDataset(ds64)
-
-        try await hdf5.closeFile(file)
 
         let readFile = try await hdf5.openFile(testFile, mode: .readOnly)
         let readDs8 = try await hdf5.openDataset("int8_data", in: readFile)
@@ -335,8 +284,6 @@ struct SwiftHDF5Tests {
         try await hdf5.readDataset(readDs8, into: &read8)
         #expect(read8 == [1, 2, 3])
 
-        try await hdf5.closeDataset(readDs8)
-        try await hdf5.closeFile(readFile)
         try? FileManager.default.removeItem(atPath: testFile)
     }
 }
