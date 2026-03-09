@@ -255,6 +255,20 @@ public enum HDF5 {
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
             defer { H5Tclose(typeId) }
 
+            // Validate type class and byte width against T before reading.
+            // H5Tequal is not used because it rejects equivalent types that differ
+            // only in byte order or native-vs-IEEE encoding (e.g. H5T_NATIVE_FLOAT
+            // vs H5T_IEEE_F32LE). Comparing class + size is the portable alternative
+            // and matches the approach used by h5py and the HDF5 C++ API.
+            let storedClass = H5Tget_class(typeId)
+            let storedSize = H5Tget_size(typeId)
+            guard storedClass == T.hdf5TypeClass && storedSize == T.hdf5TypeSize else {
+                throw HDF5Error.datasetTypeMismatch(
+                    expected: "\(T.self) (\(T.hdf5TypeClass.rawValue)/\(T.hdf5TypeSize)B)",
+                    actual: T.hdf5TypeDescription(typeId)
+                )
+            }
+
             let res = buffer.withUnsafeMutableBufferPointer { ptr in
                 H5Dread(
                     dataset,

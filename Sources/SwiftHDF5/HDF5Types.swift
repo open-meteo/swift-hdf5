@@ -8,49 +8,93 @@ import CHDF5
 ///
 /// All Swift fixed-width integer types, `Float`, and `Double` conform out of
 /// the box.
-public protocol HDF5DatasetType: Sendable, Numeric {
+public protocol HDF5DatasetType: HDF5AttributeType {
     /// A zero-like value used to fill the pre-allocated read buffer.
     static var defaultValue: Self { get }
+    /// The HDF5 type class (e.g. `H5T_INTEGER`, `H5T_FLOAT`) for this type.
+    /// Used to validate the on-disk type before reading.
+    static var hdf5TypeClass: H5T_class_t { get }
+    /// The size in bytes of this type's HDF5 representation.
+    /// Used together with ``hdf5TypeClass`` to validate the on-disk type.
+    static var hdf5TypeSize: Int { get }
+}
+
+extension HDF5DatasetType {
+    /// Returns a human-readable description of an HDF5 type identifier, suitable
+    /// for use in error messages. Describes the type class and byte width.
+    static func hdf5TypeDescription(_ typeId: hid_t) -> String {
+        let size = H5Tget_size(typeId)
+        switch H5Tget_class(typeId) {
+        case H5T_INTEGER:
+            let sign = H5Tget_sign(typeId)
+            let prefix = (sign == H5T_SGN_NONE) ? "UInt" : "Int"
+            return "\(prefix)\(size * 8)"
+        case H5T_FLOAT:
+            return "Float\(size * 8)"
+        default:
+            return "unknown(class=\(H5Tget_class(typeId).rawValue), size=\(size))"
+        }
+    }
 }
 
 extension Int8: HDF5DatasetType {
     public static var defaultValue: Int8 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 1 }
 }
 
 extension Int16: HDF5DatasetType {
     public static var defaultValue: Int16 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 2 }
 }
 
 extension Int32: HDF5DatasetType {
     public static var defaultValue: Int32 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 4 }
 }
 
 extension Int64: HDF5DatasetType {
     public static var defaultValue: Int64 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 8 }
 }
 
 extension UInt8: HDF5DatasetType {
     public static var defaultValue: UInt8 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 1 }
 }
 
 extension UInt16: HDF5DatasetType {
     public static var defaultValue: UInt16 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 2 }
 }
 
 extension UInt32: HDF5DatasetType {
     public static var defaultValue: UInt32 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 4 }
 }
 
 extension UInt64: HDF5DatasetType {
     public static var defaultValue: UInt64 { 0 }
+    public static var hdf5TypeClass: H5T_class_t { H5T_INTEGER }
+    public static var hdf5TypeSize: Int { 8 }
 }
 
 extension Float: HDF5DatasetType {
     public static var defaultValue: Float { .nan }
+    public static var hdf5TypeClass: H5T_class_t { H5T_FLOAT }
+    public static var hdf5TypeSize: Int { 4 }
 }
 
 extension Double: HDF5DatasetType {
     public static var defaultValue: Double { .nan }
+    public static var hdf5TypeClass: H5T_class_t { H5T_FLOAT }
+    public static var hdf5TypeSize: Int { 8 }
 }
 
 /// A type that can be mapped directly to a native HDF5 datatype.

@@ -21,6 +21,7 @@ public enum HDF5Error: Error, LocalizedError, CustomStringConvertible {
     case attributeReadFailed(String)
     case attributeWriteFailed(String)
     case invalidDataType
+    case datasetTypeMismatch(expected: String, actual: String)
     case operationFailed(String)
 
     public var description: String {
@@ -61,6 +62,9 @@ public enum HDF5Error: Error, LocalizedError, CustomStringConvertible {
             return "Failed to write attribute: '\(name)'"
         case .invalidDataType:
             return "Encountered an invalid or unsupported HDF5 data type."
+        case .datasetTypeMismatch(let expected, let actual):
+            return
+                "Dataset type mismatch: expected '\(expected)' but the dataset contains '\(actual)'. Use the matching Swift type or read with H5T conversion enabled."
         case .operationFailed(let reason):
             return "HDF5 operation failed: \(reason)"
         }

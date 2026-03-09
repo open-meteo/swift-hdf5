@@ -335,4 +335,106 @@ struct SwiftHDF5Tests {
 
         try? FileManager.default.removeItem(atPath: testFile)
     }
+
+    // MARK: - Dataset Type Mismatch Tests
+
+    @Test("Reading a Float dataset as Double throws datasetTypeMismatch")
+    func testReadTypeMismatchFloatAsDouble() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_type_mismatch.h5").path
+        defer { try? FileManager.default.removeItem(atPath: testFile) }
+
+        try await {
+            let file = try await HDF5.createFile(testFile)
+            let dataspace = try await HDF5.createDataspace(dimensions: [3])
+            let dataset = try await file.createDataset(
+                "floats",
+                datatype: HDF5Datatype.float,
+                dataspace: dataspace
+            )
+            try await dataset.writeDataset(data: [Float(1.0), Float(2.0), Float(3.0)])
+        }()
+
+        let file = try await HDF5.openFile(testFile, mode: .readOnly)
+        let dataset = try await file.openDataset("floats")
+
+        await #expect(throws: HDF5Error.self) {
+            let _: [Double] = try await dataset.readDataset()
+        }
+    }
+
+    @Test("Reading a Float dataset as Float succeeds")
+    func testReadTypeMatchFloatAsFloat() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_type_match_float.h5").path
+        defer { try? FileManager.default.removeItem(atPath: testFile) }
+
+        let written: [Float] = [1.5, 2.5, 3.5]
+        try await {
+            let file = try await HDF5.createFile(testFile)
+            let dataspace = try await HDF5.createDataspace(dimensions: [3])
+            let dataset = try await file.createDataset(
+                "floats",
+                datatype: HDF5Datatype.float,
+                dataspace: dataspace
+            )
+            try await dataset.writeDataset(data: written)
+        }()
+
+        let file = try await HDF5.openFile(testFile, mode: .readOnly)
+        let dataset = try await file.openDataset("floats")
+        let read: [Float] = try await dataset.readDataset()
+        #expect(read == written)
+    }
+
+    @Test("Reading an Int32 dataset as Int64 throws datasetTypeMismatch")
+    func testReadTypeMismatchInt32AsInt64() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_type_mismatch_int.h5").path
+        defer { try? FileManager.default.removeItem(atPath: testFile) }
+
+        try await {
+            let file = try await HDF5.createFile(testFile)
+            let dataspace = try await HDF5.createDataspace(dimensions: [2])
+            let dataset = try await file.createDataset(
+                "ints",
+                datatype: HDF5Datatype.int32,
+                dataspace: dataspace
+            )
+            try await dataset.writeDataset(data: [Int32(10), Int32(20)])
+        }()
+
+        let file = try await HDF5.openFile(testFile, mode: .readOnly)
+        let dataset = try await file.openDataset("ints")
+
+        await #expect(throws: HDF5Error.self) {
+            let _: [Int64] = try await dataset.readDataset()
+        }
+    }
+
+    @Test("readDataset(reusing:) also throws datasetTypeMismatch on wrong type")
+    func testReadReusingTypeMismatch() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("test_type_mismatch_reusing.h5").path
+        defer { try? FileManager.default.removeItem(atPath: testFile) }
+
+        try await {
+            let file = try await HDF5.createFile(testFile)
+            let dataspace = try await HDF5.createDataspace(dimensions: [4])
+            let dataset = try await file.createDataset(
+                "floats",
+                datatype: HDF5Datatype.float,
+                dataspace: dataspace
+            )
+            try await dataset.writeDataset(data: [Float(1), Float(2), Float(3), Float(4)])
+        }()
+
+        let file = try await HDF5.openFile(testFile, mode: .readOnly)
+        let dataset = try await file.openDataset("floats")
+        let buffer = [Double](repeating: 0, count: 4)
+
+        await #expect(throws: HDF5Error.self) {
+            let _: [Double] = try await dataset.readDataset(reusing: buffer)
+        }
+    }
 }
