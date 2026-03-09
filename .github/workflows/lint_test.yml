@@ -64,7 +64,7 @@ jobs:
           skip-verify-signature: true
 
       - name: Run swift-format lint
-        run: swift-format lint --recursive .
+        run: swift-format lint --strict --recursive .
 
       - name: Cache resolved dependencies
         id: cache-deps
