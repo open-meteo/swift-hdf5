@@ -228,7 +228,7 @@ public enum HDF5 {
     }
 
     static func readDataset<T: Numeric & Sendable>(_ dataset: hid_t) async throws -> [T] {
-        var buffer = try await execute {
+        let buffer = try await execute {
             let spaceId = H5Dget_space(dataset)
             guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
             defer { H5Sclose(spaceId) }
@@ -245,8 +245,7 @@ public enum HDF5 {
             let count = dims.reduce(1, *)
             return [T](repeating: 0, count: Int(count))
         }
-        buffer = try await self.readDataset(dataset, reusing: buffer)
-        return buffer
+        return try await self.readDataset(dataset, reusing: buffer)
     }
 
     static func readDataset<T: Numeric & Sendable>(
