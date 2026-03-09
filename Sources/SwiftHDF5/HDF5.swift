@@ -228,7 +228,7 @@ public enum HDF5 {
     }
 
     static func readDataset<T: Numeric & Sendable>(_ dataset: hid_t) async throws -> [T] {
-        return try await execute {
+        var buffer = try await execute {
             let spaceId = H5Dget_space(dataset)
             guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
             defer { H5Sclose(spaceId) }
@@ -243,7 +243,18 @@ public enum HDF5 {
             guard dimRes >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
 
             let count = dims.reduce(1, *)
-            var buffer = [T](repeating: 0, count: Int(count))
+            return [T](repeating: 0, count: Int(count))
+        }
+        buffer = try await self.readDataset(dataset, reusing: buffer)
+        return buffer
+    }
+
+    static func readDataset<T: Numeric & Sendable>(
+        _ dataset: hid_t,
+        reusing buffer: consuming [T]
+    ) async throws -> [T] {
+        nonisolated(unsafe) var buffer = consume buffer
+        return try await execute {
 
             let typeId = H5Dget_type(dataset)
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
@@ -260,32 +271,10 @@ public enum HDF5 {
                 )
             }
             guard res >= 0 else { throw HDF5Error.datasetReadFailed("id: \(dataset)") }
+
             return buffer
         }
     }
-
-    // static func readDataset<T: Sendable>(
-    //     _ dataset: hid_t,
-    //     into buffer: inout [T]
-    // ) async throws {
-    //     return try await execute {
-    //         let typeId = H5Dget_type(dataset)
-    //         guard typeId >= 0 else { throw HDF5Error.invalidDataType }
-    //         defer { H5Tclose(typeId) }
-
-    //         let res = buffer.withUnsafeMutableBufferPointer { ptr in
-    //             H5Dread(
-    //                 dataset,
-    //                 typeId,
-    //                 hdf5_get_s_all(),
-    //                 hdf5_get_s_all(),
-    //                 hdf5_get_p_default(),
-    //                 ptr.baseAddress
-    //             )
-    //         }
-    //         guard res >= 0 else { throw HDF5Error.datasetReadFailed("id: \(dataset)") }
-    //     }
-    // }
 
     // MARK: - Attribute operations
 

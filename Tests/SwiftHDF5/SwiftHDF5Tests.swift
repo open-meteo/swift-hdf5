@@ -75,11 +75,23 @@ struct SwiftHDF5Tests {
 
         let readData: [Int32] = try await reopenedDataset.readDataset()
         #expect(readData == data)
+        // Also test readDataset(reusing: )
+        let preallocated = [Int32](repeating: 0, count: 10)
+        // Unsafely capture the underlying buffer pointer before calling readDataset(reusing:)
+        let preallocatedPtr = preallocated.withUnsafeBufferPointer { buf -> UnsafeRawPointer in
+            guard let base = buf.baseAddress else { fatalError("preallocated buffer has no base address") }
+            return UnsafeRawPointer(base)
+        }
 
-        // Also test read(into:)
-        //        var preallocated = [Int32](repeating: 0, count: 10)
-        //        try await reopenedDataset.readDataset(into: &preallocated)
-        //        #expect(preallocated == data)
+        let reused = try await reopenedDataset.readDataset(reusing: consume preallocated)
+        #expect(reused == data)
+
+        // Capture the pointer of the returned array and verify it matches the original buffer pointer.
+        let reusedPtr = reused.withUnsafeBufferPointer { buf -> UnsafeRawPointer in
+            guard let base = buf.baseAddress else { fatalError("reused buffer has no base address") }
+            return UnsafeRawPointer(base)
+        }
+        #expect(reusedPtr == preallocatedPtr)
 
         try? FileManager.default.removeItem(atPath: testFile)
     }

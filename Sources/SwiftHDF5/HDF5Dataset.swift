@@ -15,11 +15,11 @@ public final class HDF5Dataset: Sendable {
         return try await HDF5.readDataset(id)
     }
 
-    // public func readDataset<T: Sendable>(
-    //     into buffer: inout [T]
-    // ) async throws {
-    //     try await HDF5.readDataset(id, into: &buffer)
-    // }
+    public func readDataset<T: Numeric & Sendable>(
+        reusing buffer: consuming [T]
+    ) async throws -> [T] {
+        try await HDF5.readDataset(id, reusing: consume buffer)
+    }
 
     public func getDatasetSpace() async throws -> HDF5Dataspace {
         let spaceId = try await HDF5.h5Dget_space(dataset: id)
