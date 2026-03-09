@@ -7,15 +7,15 @@ public final class HDF5Dataset: Sendable {
         self.parent = parent
     }
 
-    public func writeDataset<T: Numeric & Sendable>(data: [T]) async throws {
+    public func writeDataset<T: HDF5DatasetType>(data: [T]) async throws {
         try await HDF5.h5Dwrite(dataset: id, data: data)
     }
 
-    public func readDataset<T: Numeric & Sendable>() async throws -> [T] {
+    public func readDataset<T: HDF5DatasetType>() async throws -> [T] {
         return try await HDF5.readDataset(id)
     }
 
-    public func readDataset<T: Numeric & Sendable>(
+    public func readDataset<T: HDF5DatasetType>(
         reusing buffer: consuming [T]
     ) async throws -> [T] {
         try await HDF5.readDataset(id, reusing: consume buffer)

@@ -1,5 +1,58 @@
 import CHDF5
 
+/// A type that can be stored in and read back from an HDF5 dataset.
+///
+/// `String` deliberately does **not** conform: variable-length string datasets
+/// require a different read/write path (vlen reclaim) that is not supported by
+/// the simple contiguous array API.
+///
+/// All Swift fixed-width integer types, `Float`, and `Double` conform out of
+/// the box.
+public protocol HDF5DatasetType: Sendable, Numeric {
+    /// A zero-like value used to fill the pre-allocated read buffer.
+    static var defaultValue: Self { get }
+}
+
+extension Int8: HDF5DatasetType {
+    public static var defaultValue: Int8 { 0 }
+}
+
+extension Int16: HDF5DatasetType {
+    public static var defaultValue: Int16 { 0 }
+}
+
+extension Int32: HDF5DatasetType {
+    public static var defaultValue: Int32 { 0 }
+}
+
+extension Int64: HDF5DatasetType {
+    public static var defaultValue: Int64 { 0 }
+}
+
+extension UInt8: HDF5DatasetType {
+    public static var defaultValue: UInt8 { 0 }
+}
+
+extension UInt16: HDF5DatasetType {
+    public static var defaultValue: UInt16 { 0 }
+}
+
+extension UInt32: HDF5DatasetType {
+    public static var defaultValue: UInt32 { 0 }
+}
+
+extension UInt64: HDF5DatasetType {
+    public static var defaultValue: UInt64 { 0 }
+}
+
+extension Float: HDF5DatasetType {
+    public static var defaultValue: Float { .nan }
+}
+
+extension Double: HDF5DatasetType {
+    public static var defaultValue: Double { .nan }
+}
+
 /// A type that can be mapped directly to a native HDF5 datatype.
 ///
 /// Conforming to this protocol allows Swift types to be written and read as HDF5

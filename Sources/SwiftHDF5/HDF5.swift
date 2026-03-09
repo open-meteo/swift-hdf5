@@ -203,7 +203,7 @@ public enum HDF5 {
         return spaceId
     }
 
-    static func h5Dwrite<T: Numeric & Sendable>(dataset: hid_t, data: [T]) async throws {
+    static func h5Dwrite<T: HDF5DatasetType>(dataset: hid_t, data: [T]) async throws {
         return try await execute {
             let typeId = H5Dget_type(dataset)
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
@@ -223,7 +223,7 @@ public enum HDF5 {
         }
     }
 
-    static func readDataset<T: Numeric & Sendable>(_ dataset: hid_t) async throws -> [T] {
+    static func readDataset<T: HDF5DatasetType>(_ dataset: hid_t) async throws -> [T] {
         let buffer = try await execute {
             let spaceId = H5Dget_space(dataset)
             guard spaceId >= 0 else { throw HDF5Error.operationFailed("Failed to get dataspace") }
@@ -239,12 +239,12 @@ public enum HDF5 {
             guard dimRes >= 0 else { throw HDF5Error.operationFailed("Failed to get dimensions") }
 
             let count = dims.reduce(1, *)
-            return [T](repeating: 0, count: Int(count))
+            return [T](repeating: T.defaultValue, count: Int(count))
         }
         return try await self.readDataset(dataset, reusing: buffer)
     }
 
-    static func readDataset<T: Numeric & Sendable>(
+    static func readDataset<T: HDF5DatasetType>(
         _ dataset: hid_t,
         reusing buffer: consuming [T]
     ) async throws -> [T] {
@@ -347,7 +347,7 @@ public enum HDF5 {
         }
     }
 
-    static func readAttribute<T: Sendable>(_ name: String, from object: hid_t) async throws -> T {
+    static func readAttribute<T: HDF5AttributeType>(_ name: String, from object: hid_t) async throws -> T {
         return try await execute {
             let attrId = name.withCString {
                 H5Aopen(object, $0, hdf5_get_p_default())
