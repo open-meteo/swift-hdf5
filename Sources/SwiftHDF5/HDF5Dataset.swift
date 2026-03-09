@@ -1,8 +1,8 @@
 public final class HDF5Dataset: Sendable {
     public let id: hid_t
-    public let parent: HDF5FileOrGroup
+    public let parent: any HDF5FileOrGroup
 
-    init(id: hid_t, parent: HDF5FileOrGroup) {
+    init(id: hid_t, parent: any HDF5FileOrGroup) {
         self.id = id
         self.parent = parent
     }
