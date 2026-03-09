@@ -377,7 +377,7 @@ public enum HDF5 {
                     str = cStr.map { String(cString: $0) } ?? ""
                     // Release memory allocated by HDF5 for the vlen string.
                     _ = withUnsafeMutablePointer(to: &cStr) { ptr in
-                        H5Treclaim(typeId, dataspaceId, hdf5_get_p_default(), ptr)
+                        hdf5_vlen_reclaim(typeId, dataspaceId, hdf5_get_p_default(), ptr)
                     }
                 } else {
                     let size = H5Tget_size(typeId)
