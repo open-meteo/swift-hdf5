@@ -22,7 +22,7 @@ public typealias hid_t = CHDF5.hid_t
 
 // MARK: - HDF5 Datatype
 
-public struct HDF5Datatype {
+public enum HDF5Datatype {
     public static var int8: hid_t { hdf5_get_native_int8() }
     public static var int16: hid_t { hdf5_get_native_int16() }
     public static var int32: hid_t { hdf5_get_native_int32() }
