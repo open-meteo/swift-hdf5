@@ -37,15 +37,15 @@ struct SwiftHDF5Tests {
             let file = try await HDF5.createFile(testFile)
 
             let group = try await file.createGroup("data")
-            #expect(try! await group.name == "/data")
+            #expect(try await group.name == "/data")
 
             let subgroup = try await group.createGroup("measurements")
-            #expect(try! await subgroup.name == "/data/measurements")
+            #expect(try await subgroup.name == "/data/measurements")
         }()
 
         let reopenedFile = try await HDF5.openFile(testFile, mode: .readOnly)
         let reopenedGroup = try await reopenedFile.openGroup("data")
-        #expect(try! await reopenedGroup.name == "/data")
+        #expect(try await reopenedGroup.name == "/data")
 
         try? FileManager.default.removeItem(atPath: testFile)
     }
