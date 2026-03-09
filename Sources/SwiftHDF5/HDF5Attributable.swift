@@ -3,12 +3,16 @@ public protocol HDF5Attributable: Sendable {
 }
 
 extension HDF5Attributable {
-    public func getName() async throws -> String {
-        return try await HDF5.h5Iget_name(id: id)
+    public var name: String {
+        get async throws {
+            return try await HDF5.h5Iget_name(id: id)
+        }
     }
 
-    public func getFileName() async throws -> String {
-        return try await HDF5.h5Fget_name(id: id)
+    public var fileName: String {
+        get async throws {
+            return try await HDF5.h5Fget_name(id: id)
+        }
     }
 
     public func writeAttribute<T: Sendable>(

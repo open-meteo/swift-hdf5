@@ -16,11 +16,11 @@ struct SwiftHDF5Tests {
 
         try await {
             let file = try await HDF5.createFile(testFile, mode: .truncate)
-            #expect(try await file.getFileName() == testFile)
+            #expect(try await file.fileName == testFile)
         }()
 
         let openedFile = try await HDF5.openFile(testFile, mode: .readOnly)
-        #expect(try await openedFile.getFileName() == testFile)
+        #expect(try await openedFile.fileName == testFile)
 
         try? FileManager.default.removeItem(atPath: testFile)
     }
@@ -37,15 +37,15 @@ struct SwiftHDF5Tests {
             let file = try await HDF5.createFile(testFile)
 
             let group = try await file.createGroup("data")
-            #expect(try! await group.getName() == "/data")
+            #expect(try! await group.name == "/data")
 
             let subgroup = try await group.createGroup("measurements")
-            #expect(try! await subgroup.getName() == "/data/measurements")
+            #expect(try! await subgroup.name == "/data/measurements")
         }()
 
         let reopenedFile = try await HDF5.openFile(testFile, mode: .readOnly)
         let reopenedGroup = try await reopenedFile.openGroup("data")
-        #expect(try! await reopenedGroup.getName() == "/data")
+        #expect(try! await reopenedGroup.name == "/data")
 
         try? FileManager.default.removeItem(atPath: testFile)
     }
@@ -150,8 +150,8 @@ struct SwiftHDF5Tests {
         let reopenedFile = try await HDF5.openFile(testFile, mode: .readOnly)
         let reopenedDataset = try await reopenedFile.openDataset("matrix")
 
-        let space = try await reopenedDataset.getDatasetSpace()
-        let readDims = try await space.getDimensions()
+        let space = try await reopenedDataset.space
+        let readDims = try await space.dimensions
         #expect(readDims.count == 2)
         #expect(readDims[0] == 3)
         #expect(readDims[1] == 4)
