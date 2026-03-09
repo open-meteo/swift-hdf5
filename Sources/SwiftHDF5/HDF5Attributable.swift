@@ -30,4 +30,3 @@ extension HDF5Attributable {
 
 extension HDF5Group: HDF5Attributable {}
 extension HDF5Dataset: HDF5Attributable {}
-extension HDF5Dataspace: HDF5Attributable {}
