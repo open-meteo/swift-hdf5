@@ -52,7 +52,9 @@ public enum HDF5 {
         }
     }
 
-    static func execute<T: Sendable>(_ work: @escaping @Sendable () throws -> sending T) async throws -> sending T {
+    private static func execute<T: Sendable>(
+        _ work: @escaping @Sendable () throws -> sending T
+    ) async throws -> sending T {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 do {
