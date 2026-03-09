@@ -139,12 +139,6 @@ public enum HDF5 {
         return HDF5Dataspace(id: spaceId)
     }
 
-    // fileprivate func h5Screate_simple(dimensions: [hsize_t]) -> hid_t {
-    //     return dimensions.withUnsafeBufferPointer { ptr in
-    //         H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
-    //     }
-    // }
-
     static func h5Sget_simple_extent_dims(space_id: hid_t) async throws -> [hsize_t] {
         return try await execute {
             let ndims = H5Sget_simple_extent_ndims(space_id)
@@ -207,7 +201,7 @@ public enum HDF5 {
         return spaceId
     }
 
-    static func h5Dwrite<T: Sendable>(dataset: hid_t, data: [T]) async throws {
+    static func h5Dwrite<T: Numeric & Sendable>(dataset: hid_t, data: [T]) async throws {
         return try await execute {
             let typeId = H5Dget_type(dataset)
             guard typeId >= 0 else { throw HDF5Error.invalidDataType }
@@ -324,17 +318,11 @@ public enum HDF5 {
             if T.self == String.self {
                 let size = H5Tget_size(typeId)
                 guard size > 0 else { return "" as! T }
-                // TODO: use String(unsafeUninitializedCapacity
-                var buffer = [UInt8](repeating: 0, count: size)
-                let res = buffer.withUnsafeMutableBufferPointer { ptr in
-                    H5Aread(attrId, typeId, ptr.baseAddress)
-                }
-                guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
-
-                let len = buffer.firstIndex(of: 0) ?? buffer.count
-                let str =
-                    String(bytes: buffer[..<len], encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespaces) ?? ""
+                let str = try String(unsafeUninitializedCapacity: size) { ptr in
+                    let res = H5Aread(attrId, typeId, ptr.baseAddress)
+                    guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
+                    return ptr.firstIndex(of: 0) ?? size
+                }.trimmingCharacters(in: .whitespaces)
                 return str as! T
             }
 
