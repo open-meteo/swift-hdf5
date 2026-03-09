@@ -273,13 +273,53 @@ public enum HDF5 {
 
     // MARK: - Attribute operations
 
-    static func writeAttribute<T: Sendable>(
+    /// Write an attribute named `name` on the given HDF5 object using the HDF5
+    /// datatype associated with `T` (via `T.hdf5TypeId`). The datatype is
+    /// inferred from the Swift type, so callers do not need to supply it.
+    static func writeAttribute<T: HDF5AttributeType>(
         _ name: String,
         on object: hid_t,
-        value: T,
-        datatype: hid_t
+        value: T
     ) async throws {
+        if T.self == String.self {
+            // Strings need their own write path: the datatype owns heap memory and
+            // must be closed after use, and H5Awrite expects a pointer-to-pointer.
+            try await writeStringAttribute(name: name, on: object, value: value as! String)
+        } else {
+            try await execute {
+                let dataspaceId = H5Screate(hdf5_get_s_scalar())
+                guard dataspaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
+                defer { H5Sclose(dataspaceId) }
+
+                let attrId = name.withCString {
+                    H5Acreate2(
+                        object,
+                        $0,
+                        T.hdf5TypeId,
+                        dataspaceId,
+                        hdf5_get_p_default(),
+                        hdf5_get_p_default()
+                    )
+                }
+                guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
+                defer { H5Aclose(attrId) }
+
+                var mutableValue = value
+                let res = withUnsafePointer(to: &mutableValue) { ptr in
+                    H5Awrite(attrId, T.hdf5TypeId, ptr)
+                }
+                guard res >= 0 else { throw HDF5Error.attributeWriteFailed(name) }
+            }
+        }
+    }
+
+    /// Helper that performs the string-specific attribute creation and write.
+    private static func writeStringAttribute(name: String, on object: hid_t, value: String) async throws {
         try await execute {
+            let typeId = String.hdf5TypeId
+            guard typeId >= 0 else { throw HDF5Error.invalidDataType }
+            defer { H5Tclose(typeId) }
+
             let dataspaceId = H5Screate(hdf5_get_s_scalar())
             guard dataspaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
             defer { H5Sclose(dataspaceId) }
@@ -288,7 +328,7 @@ public enum HDF5 {
                 H5Acreate2(
                     object,
                     $0,
-                    datatype,
+                    typeId,
                     dataspaceId,
                     hdf5_get_p_default(),
                     hdf5_get_p_default()
@@ -297,9 +337,11 @@ public enum HDF5 {
             guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
             defer { H5Aclose(attrId) }
 
-            var mutableValue = value
-            let res = withUnsafePointer(to: &mutableValue) { ptr in
-                H5Awrite(attrId, datatype, ptr)
+            // H5Awrite for variable-length strings expects a `const char **`.
+            let str = value
+            let res = str.withCString { cStr -> herr_t in
+                var ptr: UnsafePointer<CChar>? = cStr
+                return withUnsafePointer(to: &ptr) { H5Awrite(attrId, typeId, $0) }
             }
             guard res >= 0 else { throw HDF5Error.attributeWriteFailed(name) }
         }
@@ -318,13 +360,34 @@ public enum HDF5 {
             defer { H5Tclose(typeId) }
 
             if T.self == String.self {
-                let size = H5Tget_size(typeId)
-                guard size > 0 else { return "" as! T }
-                let str = try String(unsafeUninitializedCapacity: size) { ptr in
-                    let res = H5Aread(attrId, typeId, ptr.baseAddress)
+                // Distinguish variable-length strings (H5T_VARIABLE) from fixed-length ones.
+                // For variable-length types H5Aread fills a `char *` allocated by HDF5 that
+                // must be reclaimed via H5Treclaim; H5Tget_size returns sizeof(char *), not
+                // the string length, so it cannot be used to size the read buffer.
+                let isVlen = H5Tis_variable_str(typeId) > 0
+                let str: String
+                if isVlen {
+                    // H5Aread expects a pointer to a `char *` (i.e. `char **`).
+                    var cStr: UnsafeMutablePointer<CChar>? = nil
+                    let dataspaceId = H5Aget_space(attrId)
+                    defer { if dataspaceId >= 0 { H5Sclose(dataspaceId) } }
+                    let res = withUnsafeMutablePointer(to: &cStr) { H5Aread(attrId, typeId, $0) }
                     guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
-                    return ptr.firstIndex(of: 0) ?? size
-                }.trimmingCharacters(in: .whitespaces)
+                    // Copy into Swift string before reclaiming the HDF5 allocation.
+                    str = cStr.map { String(cString: $0) } ?? ""
+                    // Release memory allocated by HDF5 for the vlen string.
+                    _ = withUnsafeMutablePointer(to: &cStr) { ptr in
+                        H5Treclaim(typeId, dataspaceId, hdf5_get_p_default(), ptr)
+                    }
+                } else {
+                    let size = H5Tget_size(typeId)
+                    guard size > 0 else { return "" as! T }
+                    str = try String(unsafeUninitializedCapacity: size + 1) { ptr in
+                        let res = H5Aread(attrId, typeId, ptr.baseAddress)
+                        guard res >= 0 else { throw HDF5Error.attributeReadFailed(name) }
+                        return ptr.firstIndex(of: 0) ?? size
+                    }.trimmingCharacters(in: .whitespaces)
+                }
                 return str as! T
             }
 

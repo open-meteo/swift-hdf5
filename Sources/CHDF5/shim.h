@@ -36,7 +36,9 @@ static inline hid_t hdf5_get_native_float(void) { return H5T_NATIVE_FLOAT; }
 static inline hid_t hdf5_get_native_double(void) { return H5T_NATIVE_DOUBLE; }
 static inline hid_t hdf5_get_native_char(void) { return H5T_NATIVE_CHAR; }
 
-// String type helper
+// String type helpers
 static inline hid_t hdf5_get_c_s1(void) { return H5T_C_S1; }
+// H5T_VARIABLE is a macro that cannot be imported directly into Swift
+static inline size_t hdf5_variable_length_string_size(void) { return H5T_VARIABLE; }
 
 #endif // CHDF5_SHIM_H

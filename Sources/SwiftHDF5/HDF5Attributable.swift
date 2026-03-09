@@ -15,17 +15,30 @@ extension HDF5Attributable {
         }
     }
 
-    public func writeAttribute<T: Sendable>(
+    /// Writes an attribute whose HDF5 datatype is inferred automatically from the
+    /// Swift type of `value`.
+    ///
+    /// ```swift
+    /// try await dataset.writeAttribute("scale", value: Double(1.5))
+    /// try await dataset.writeAttribute("label", value: "temperature")
+    /// ```
+    public func writeAttribute<T: HDF5AttributeType>(
         _ name: String,
-        value: T,
-        datatype: hid_t
+        value: T
     ) async throws {
-        try await HDF5.writeAttribute(name, on: id, value: value, datatype: datatype)
+        try await HDF5.writeAttribute(name, on: id, value: value)
     }
 
-    public func readAttribute<T: Sendable>(_ name: String) async throws -> T {
+    /// Reads an attribute, inferring the expected HDF5 datatype from the return type.
+    ///
+    /// ```swift
+    /// let scale: Double = try await dataset.readAttribute("scale")
+    /// let label: String = try await dataset.readAttribute("label")
+    /// ```
+    public func readAttribute<T: HDF5AttributeType>(_ name: String) async throws -> T {
         try await HDF5.readAttribute(name, from: id)
     }
+
 }
 
 extension HDF5Group: HDF5Attributable {}
