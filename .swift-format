@@ -7,6 +7,7 @@
     "indentation": {
         "spaces": 4
     },
+    "indentBlankLines": false,
     "lineBreakAroundMultilineExpressionChainComponents": false,
     "lineBreakBeforeControlFlowKeywords": false,
     "lineBreakBeforeEachArgument": true,
@@ -15,11 +16,6 @@
     "lineLength": 120,
     "maximumBlankLines": 1,
     "multiElementCollectionTrailingCommas": true,
-    "noAssignmentInExpressions": {
-        "allowedFunctions": [
-            "XCTAssertNoThrow"
-        ]
-    },
     "prioritizeKeepingFunctionOutputTogether": true,
     "reflowMultilineStringLiterals": {
         "never": {
