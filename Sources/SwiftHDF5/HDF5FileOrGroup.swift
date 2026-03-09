@@ -30,7 +30,6 @@ extension HDF5FileOrGroup {
             datatype: datatype,
             dataspace: dataspace.id
         )
-        guard datasetId >= 0 else { throw HDF5Error.datasetCreateFailed(name) }
         return HDF5Dataset(id: datasetId, parent: self)
     }
 
