@@ -17,6 +17,7 @@ public enum FileAccessMode: Sendable {
     }
 }
 
+// swift-format-ignore: TypeNamesShouldBeCapitalized
 public typealias hid_t = CHDF5.hid_t
 
 // MARK: - HDF5 Datatype
