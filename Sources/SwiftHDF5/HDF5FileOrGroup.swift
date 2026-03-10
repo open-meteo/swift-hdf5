@@ -50,9 +50,9 @@ public protocol HDF5FileOrGroup {
     /// - Returns: The newly created ``HDF5Dataset``.
     /// - Throws: ``HDF5Error/datasetCreateFailed(_:)`` if the C library returns an
     ///   error (e.g. a dataset with that name already exists).
-    func createDataset(
+    func createDataset<T: HDF5DatasetType>(
         _ name: String,
-        datatype: hid_t,
+        datatype: T.Type,
         dataspace: HDF5Dataspace
     ) async throws -> HDF5Dataset
 
@@ -80,15 +80,15 @@ extension HDF5FileOrGroupImpl {
         return HDF5Group(id: groupId, parent: self)
     }
 
-    public func createDataset(
+    public func createDataset<T: HDF5DatasetType>(
         _ name: String,
-        datatype: hid_t,
+        datatype: T.Type,
         dataspace: HDF5Dataspace
     ) async throws -> HDF5Dataset {
         let datasetId = try await HDF5.h5Dcreate2(
             parent: self.id,
             name: name,
-            datatype: datatype,
+            datatype: datatype.hdf5TypeId,
             dataspace: dataspace.id
         )
         return HDF5Dataset(id: datasetId, parent: self)

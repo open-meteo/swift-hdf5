@@ -1,5 +1,48 @@
 import CHDF5
 
+/// Native HDF5 type identifiers for use with ``HDF5FileOrGroup/createDataset(_:datatype:dataspace:)``.
+///
+/// Each property returns the HDF5 identifier (`hid_t`) for the corresponding
+/// platform-native C type. The mapping to Swift types is:
+///
+/// | Property       | Swift type  |
+/// |----------------|-------------|
+/// | ``int8``       | `Int8`      |
+/// | ``int16``      | `Int16`     |
+/// | ``int32``      | `Int32`     |
+/// | ``int64``      | `Int64`     |
+/// | ``uint8``      | `UInt8`     |
+/// | ``uint16``     | `UInt16`    |
+/// | ``uint32``     | `UInt32`    |
+/// | ``uint64``     | `UInt64`    |
+/// | ``float``      | `Float`     |
+/// | ``double``     | `Double`    |
+/// | ``char``       | `CChar`     |
+enum HDF5Datatype {
+    /// The native signed 8-bit integer type (`H5T_NATIVE_INT8`). Corresponds to Swift's `Int8`.
+    static var int8: hid_t { hdf5_get_native_int8() }
+    /// The native signed 16-bit integer type (`H5T_NATIVE_INT16`). Corresponds to Swift's `Int16`.
+    static var int16: hid_t { hdf5_get_native_int16() }
+    /// The native signed 32-bit integer type (`H5T_NATIVE_INT32`). Corresponds to Swift's `Int32`.
+    static var int32: hid_t { hdf5_get_native_int32() }
+    /// The native signed 64-bit integer type (`H5T_NATIVE_INT64`). Corresponds to Swift's `Int64`.
+    static var int64: hid_t { hdf5_get_native_int64() }
+    /// The native unsigned 8-bit integer type (`H5T_NATIVE_UINT8`). Corresponds to Swift's `UInt8`.
+    static var uint8: hid_t { hdf5_get_native_uint8() }
+    /// The native unsigned 16-bit integer type (`H5T_NATIVE_UINT16`). Corresponds to Swift's `UInt16`.
+    static var uint16: hid_t { hdf5_get_native_uint16() }
+    /// The native unsigned 32-bit integer type (`H5T_NATIVE_UINT32`). Corresponds to Swift's `UInt32`.
+    static var uint32: hid_t { hdf5_get_native_uint32() }
+    /// The native unsigned 64-bit integer type (`H5T_NATIVE_UINT64`). Corresponds to Swift's `UInt64`.
+    static var uint64: hid_t { hdf5_get_native_uint64() }
+    /// The native 32-bit floating-point type (`H5T_NATIVE_FLOAT`). Corresponds to Swift's `Float`.
+    static var float: hid_t { hdf5_get_native_float() }
+    /// The native 64-bit floating-point type (`H5T_NATIVE_DOUBLE`). Corresponds to Swift's `Double`.
+    static var double: hid_t { hdf5_get_native_double() }
+    /// The native C `char` type (`H5T_NATIVE_CHAR`). Corresponds to Swift's `CChar`.
+    static var char: hid_t { hdf5_get_native_char() }
+}
+
 /// A type that can be stored in and read back from an HDF5 dataset.
 ///
 /// `String` deliberately does **not** conform: variable-length string datasets
