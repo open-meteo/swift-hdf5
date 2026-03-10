@@ -1,28 +1,30 @@
 {
+    "version" : 1,
+    "indentation": {
+        "spaces": 4
+    },
+    "tabWidth" : 4,
     "fileScopedDeclarationPrivacy": {
         "accessLevel": "private"
     },
     "indentConditionalCompilationBlocks": false,
     "indentSwitchCaseLabels": false,
-    "indentation": {
-        "spaces": 4
-    },
     "indentBlankLines": false,
     "lineBreakAroundMultilineExpressionChainComponents": false,
     "lineBreakBeforeControlFlowKeywords": false,
     "lineBreakBeforeEachArgument": true,
-    "lineBreakBeforeEachGenericRequirement": false,
-    "lineBreakBetweenDeclarationAttributes": false,
+    "lineBreakBeforeEachGenericRequirement": true,
+    "lineBreakBetweenDeclarationAttributes": true,
     "lineLength": 120,
     "maximumBlankLines": 1,
+    "respectsExistingLineBreaks": true,
     "multiElementCollectionTrailingCommas": true,
     "prioritizeKeepingFunctionOutputTogether": true,
     "reflowMultilineStringLiterals": {
-        "never": {
-
-        }
+        "never": { }
     },
-    "respectsExistingLineBreaks": true,
+    "spacesAroundRangeFormationOperators": false,
+    "spacesBeforeEndOfLineComments": 2,
     "rules": {
         "AllPublicDeclarationsHaveDocumentation": false,
         "AlwaysUseLiteralForEmptyCollectionInit": false,
@@ -66,7 +68,4 @@
         "UseWhereClausesInForLoops": false,
         "ValidateDocumentationComments": false
     },
-    "spacesAroundRangeFormationOperators": false,
-    "spacesBeforeEndOfLineComments": 2,
-    "version": 1,
 }

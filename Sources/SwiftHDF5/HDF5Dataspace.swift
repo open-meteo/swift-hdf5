@@ -29,9 +29,7 @@ public final class HDF5Dataspace: Sendable {
     /// - Throws: ``HDF5Error/operationFailed(_:)`` if the rank or dimension
     ///   sizes cannot be retrieved from the C library.
     public var dimensions: [UInt64] {
-        get async throws {
-            return try await HDF5.h5Sget_simple_extent_dims(space_id: id)
-        }
+        get async throws { return try await HDF5.h5Sget_simple_extent_dims(space_id: id) }
     }
 
     deinit {

@@ -48,9 +48,7 @@ public typealias hid_t = CHDF5.hid_t
 /// There is no need to add any additional synchronisation when using this
 /// library from multiple tasks or actors.
 public enum HDF5 {
-    private static let queue = DispatchQueue(
-        label: "SwiftHDF5.single-thread"
-    )
+    private static let queue = DispatchQueue(label: "SwiftHDF5.single-thread")
 
     private static func execute<T: Sendable>(_ work: @escaping @Sendable () -> sending T) async -> sending T {
         await withCheckedContinuation { continuation in
@@ -69,9 +67,7 @@ public enum HDF5 {
                 do {
                     let result = try work()
                     continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+                } catch { continuation.resume(throwing: error) }
             }
         }
     }
@@ -91,9 +87,7 @@ public enum HDF5 {
     ///   using ``FileAccessMode/exclusive``).
     static public func createFile(_ path: String, mode: FileAccessMode = .truncate) async throws -> HDF5File {
         let fileId = await execute {
-            path.withCString { cPath in
-                H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default())
-            }
+            path.withCString { cPath in H5Fcreate(cPath, mode.cMode, hdf5_get_p_default(), hdf5_get_p_default()) }
         }
         guard fileId >= 0 else { throw HDF5Error.fileCreateFailed(path) }
         return HDF5File(id: fileId)
@@ -110,19 +104,13 @@ public enum HDF5 {
     /// - Throws: ``HDF5Error/fileOpenFailed(_:)`` if the file does not exist or
     ///   cannot be opened with the requested access mode.
     static public func openFile(_ path: String, mode: FileAccessMode = .readOnly) async throws -> HDF5File {
-        let fileId = await execute {
-            path.withCString { cPath in
-                H5Fopen(cPath, mode.cMode, hdf5_get_p_default())
-            }
-        }
+        let fileId = await execute { path.withCString { cPath in H5Fopen(cPath, mode.cMode, hdf5_get_p_default()) } }
         guard fileId >= 0 else { throw HDF5Error.fileOpenFailed(path) }
         return HDF5File(id: fileId)
     }
 
     static func h5Fclose(_ id: hid_t) throws {
-        guard queue.sync(execute: { H5Fclose(id) }) >= 0 else {
-            throw HDF5Error.fileCloseFailed
-        }
+        guard queue.sync(execute: { H5Fclose(id) }) >= 0 else { throw HDF5Error.fileCloseFailed }
     }
 
     // MARK: - Group operations
@@ -130,13 +118,7 @@ public enum HDF5 {
     static func h5Gcreate2(_ name: String, _ parentId: hid_t) async throws -> hid_t {
         let groupId = await execute {
             name.withCString {
-                H5Gcreate2(
-                    parentId,
-                    $0,
-                    hdf5_get_p_default(),
-                    hdf5_get_p_default(),
-                    hdf5_get_p_default()
-                )
+                H5Gcreate2(parentId, $0, hdf5_get_p_default(), hdf5_get_p_default(), hdf5_get_p_default())
             }
         }
         guard groupId >= 0 else { throw HDF5Error.groupCreateFailed(name) }
@@ -144,19 +126,13 @@ public enum HDF5 {
     }
 
     static func h5Gopen2(_ name: String, _ parentId: hid_t) async throws -> hid_t {
-        let groupId = await execute {
-            name.withCString {
-                H5Gopen2(parentId, $0, hdf5_get_p_default())
-            }
-        }
+        let groupId = await execute { name.withCString { H5Gopen2(parentId, $0, hdf5_get_p_default()) } }
         guard groupId >= 0 else { throw HDF5Error.groupOpenFailed(name) }
         return groupId
     }
 
     static func h5Gclose(_ id: hid_t) throws {
-        guard queue.sync(execute: { H5Gclose(id) }) >= 0 else {
-            throw HDF5Error.groupCloseFailed
-        }
+        guard queue.sync(execute: { H5Gclose(id) }) >= 0 else { throw HDF5Error.groupCloseFailed }
     }
 
     // MARK: - Dataspace operations
@@ -174,8 +150,7 @@ public enum HDF5 {
     ///   an error (e.g. `dimensions` is empty).
     static public func createDataspace(dimensions: [hsize_t]) async throws -> HDF5Dataspace {
         let spaceId = await execute {
-            dimensions.withUnsafeBufferPointer { ptr in
-                H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
+            dimensions.withUnsafeBufferPointer { ptr in H5Screate_simple(Int32(dimensions.count), ptr.baseAddress, nil)
             }
         }
         guard spaceId >= 0 else { throw HDF5Error.dataspaceCreateFailed }
@@ -197,9 +172,7 @@ public enum HDF5 {
     }
 
     static func h5Sclose(_ id: hid_t) throws {
-        guard queue.sync(execute: { H5Sclose(id) }) >= 0 else {
-            throw HDF5Error.dataspaceCloseFailed
-        }
+        guard queue.sync(execute: { H5Sclose(id) }) >= 0 else { throw HDF5Error.dataspaceCloseFailed }
     }
 
     // MARK: - Dataset operations
@@ -223,19 +196,13 @@ public enum HDF5 {
     }
 
     static func h5Dopen2(parent: hid_t, name: String) async throws -> hid_t {
-        let datasetId = await execute {
-            name.withCString {
-                H5Dopen2(parent, $0, hdf5_get_p_default())
-            }
-        }
+        let datasetId = await execute { name.withCString { H5Dopen2(parent, $0, hdf5_get_p_default()) } }
         guard datasetId >= 0 else { throw HDF5Error.datasetOpenFailed(name) }
         return datasetId
     }
 
     static func h5Dclose(_ id: hid_t) throws {
-        guard queue.sync(execute: { H5Dclose(id) }) >= 0 else {
-            throw HDF5Error.datasetCloseFailed
-        }
+        guard queue.sync(execute: { H5Dclose(id) }) >= 0 else { throw HDF5Error.datasetCloseFailed }
     }
 
     static func h5Dget_space(dataset: hid_t) async throws -> hid_t {
@@ -251,14 +218,7 @@ public enum HDF5 {
             defer { H5Tclose(typeId) }
 
             let res = data.withUnsafeBufferPointer { ptr in
-                H5Dwrite(
-                    dataset,
-                    typeId,
-                    hdf5_get_s_all(),
-                    hdf5_get_s_all(),
-                    hdf5_get_p_default(),
-                    ptr.baseAddress
-                )
+                H5Dwrite(dataset, typeId, hdf5_get_s_all(), hdf5_get_s_all(), hdf5_get_p_default(), ptr.baseAddress)
             }
             guard res >= 0 else { throw HDF5Error.datasetWriteFailed("id: \(dataset)") }
         }
@@ -285,10 +245,7 @@ public enum HDF5 {
         return try await self.readDataset(dataset, reusing: buffer)
     }
 
-    static func readDataset<T: HDF5DatasetType>(
-        _ dataset: hid_t,
-        reusing buffer: consuming [T]
-    ) async throws -> [T] {
+    static func readDataset<T: HDF5DatasetType>(_ dataset: hid_t, reusing buffer: consuming [T]) async throws -> [T] {
         nonisolated(unsafe) var buffer = consume buffer
         return try await execute {
 
@@ -311,14 +268,7 @@ public enum HDF5 {
             }
 
             let res = buffer.withUnsafeMutableBufferPointer { ptr in
-                H5Dread(
-                    dataset,
-                    typeId,
-                    hdf5_get_s_all(),
-                    hdf5_get_s_all(),
-                    hdf5_get_p_default(),
-                    ptr.baseAddress
-                )
+                H5Dread(dataset, typeId, hdf5_get_s_all(), hdf5_get_s_all(), hdf5_get_p_default(), ptr.baseAddress)
             }
             guard res >= 0 else { throw HDF5Error.datasetReadFailed("id: \(dataset)") }
 
@@ -331,11 +281,7 @@ public enum HDF5 {
     /// Write an attribute named `name` on the given HDF5 object using the HDF5
     /// datatype associated with `T` (via `T.hdf5TypeId`). The datatype is
     /// inferred from the Swift type, so callers do not need to supply it.
-    static func writeAttribute<T: HDF5AttributeType>(
-        _ name: String,
-        on object: hid_t,
-        value: T
-    ) async throws {
+    static func writeAttribute<T: HDF5AttributeType>(_ name: String, on object: hid_t, value: T) async throws {
         if T.self == String.self {
             // Strings need their own write path: the datatype owns heap memory and
             // must be closed after use, and H5Awrite expects a pointer-to-pointer.
@@ -347,22 +293,13 @@ public enum HDF5 {
                 defer { H5Sclose(dataspaceId) }
 
                 let attrId = name.withCString {
-                    H5Acreate2(
-                        object,
-                        $0,
-                        T.hdf5TypeId,
-                        dataspaceId,
-                        hdf5_get_p_default(),
-                        hdf5_get_p_default()
-                    )
+                    H5Acreate2(object, $0, T.hdf5TypeId, dataspaceId, hdf5_get_p_default(), hdf5_get_p_default())
                 }
                 guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
                 defer { H5Aclose(attrId) }
 
                 var mutableValue = value
-                let res = withUnsafePointer(to: &mutableValue) { ptr in
-                    H5Awrite(attrId, T.hdf5TypeId, ptr)
-                }
+                let res = withUnsafePointer(to: &mutableValue) { ptr in H5Awrite(attrId, T.hdf5TypeId, ptr) }
                 guard res >= 0 else { throw HDF5Error.attributeWriteFailed(name) }
             }
         }
@@ -380,14 +317,7 @@ public enum HDF5 {
             defer { H5Sclose(dataspaceId) }
 
             let attrId = name.withCString {
-                H5Acreate2(
-                    object,
-                    $0,
-                    typeId,
-                    dataspaceId,
-                    hdf5_get_p_default(),
-                    hdf5_get_p_default()
-                )
+                H5Acreate2(object, $0, typeId, dataspaceId, hdf5_get_p_default(), hdf5_get_p_default())
             }
             guard attrId >= 0 else { throw HDF5Error.attributeCreateFailed(name) }
             defer { H5Aclose(attrId) }
@@ -404,9 +334,7 @@ public enum HDF5 {
 
     static func readAttribute<T: HDF5AttributeType>(_ name: String, from object: hid_t) async throws -> T {
         return try await execute {
-            let attrId = name.withCString {
-                H5Aopen(object, $0, hdf5_get_p_default())
-            }
+            let attrId = name.withCString { H5Aopen(object, $0, hdf5_get_p_default()) }
             guard attrId >= 0 else { throw HDF5Error.attributeOpenFailed(name) }
             defer { H5Aclose(attrId) }
 

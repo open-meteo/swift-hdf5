@@ -61,9 +61,7 @@ public final class HDF5Dataset: Sendable {
     ///   error, ``HDF5Error/datasetTypeMismatch(expected:actual:)`` if `T` does
     ///   not match the stored type, or ``HDF5Error/invalidDataType`` if the type
     ///   identifier cannot be retrieved.
-    public func readDataset<T: HDF5DatasetType>() async throws -> [T] {
-        return try await HDF5.readDataset(id)
-    }
+    public func readDataset<T: HDF5DatasetType>() async throws -> [T] { return try await HDF5.readDataset(id) }
 
     /// Reads all elements of this dataset into a pre-allocated buffer and
     /// returns it, avoiding an extra allocation compared to ``readDataset()``.
@@ -79,9 +77,7 @@ public final class HDF5Dataset: Sendable {
     ///   error, ``HDF5Error/datasetTypeMismatch(expected:actual:)`` if `T` does
     ///   not match the stored type, or ``HDF5Error/invalidDataType`` if the type
     ///   identifier cannot be retrieved.
-    public func readDataset<T: HDF5DatasetType>(
-        reusing buffer: consuming [T]
-    ) async throws -> [T] {
+    public func readDataset<T: HDF5DatasetType>(reusing buffer: consuming [T]) async throws -> [T] {
         try await HDF5.readDataset(id, reusing: consume buffer)
     }
 
@@ -104,7 +100,5 @@ public final class HDF5Dataset: Sendable {
         }
     }
 
-    deinit {
-        try? HDF5.h5Dclose(id)
-    }
+    deinit { try? HDF5.h5Dclose(id) }
 }

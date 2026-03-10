@@ -52,7 +52,7 @@ public protocol HDF5FileOrGroup {
     ///   error (e.g. a dataset with that name already exists).
     func createDataset<T: HDF5DatasetType>(
         _ name: String,
-        datatype: T.Type,
+        of datatype: T.Type,
         dataspace: HDF5Dataspace
     ) async throws -> HDF5Dataset
 
@@ -65,9 +65,7 @@ public protocol HDF5FileOrGroup {
     func openDataset(_ name: String) async throws -> HDF5Dataset
 }
 
-protocol HDF5FileOrGroupImpl: HDF5AttributableImpl, HDF5FileOrGroup {
-    var id: hid_t { get }
-}
+protocol HDF5FileOrGroupImpl: HDF5AttributableImpl, HDF5FileOrGroup { var id: hid_t { get } }
 
 extension HDF5FileOrGroupImpl {
     public func createGroup(_ name: String) async throws -> HDF5Group {
@@ -82,7 +80,7 @@ extension HDF5FileOrGroupImpl {
 
     public func createDataset<T: HDF5DatasetType>(
         _ name: String,
-        datatype: T.Type,
+        of datatype: T.Type,
         dataspace: HDF5Dataspace
     ) async throws -> HDF5Dataset {
         let datasetId = try await HDF5.h5Dcreate2(

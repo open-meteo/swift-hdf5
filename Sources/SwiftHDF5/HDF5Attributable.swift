@@ -33,10 +33,7 @@ public protocol HDF5Attributable {
     ///   - value: The scalar value to store.
     /// - Throws: ``HDF5Error/attributeCreateFailed(_:)`` or
     ///   ``HDF5Error/attributeWriteFailed(_:)`` on failure.
-    func writeAttribute<T: HDF5AttributeType>(
-        _ name: String,
-        value: T
-    ) async throws
+    func writeAttribute<T: HDF5AttributeType>(_ name: String, value: T) async throws
 
     /// Reads a scalar attribute named `name` from this object.
     ///
@@ -55,22 +52,12 @@ public protocol HDF5Attributable {
     func readAttribute<T: HDF5AttributeType>(_ name: String) async throws -> T
 }
 
-protocol HDF5AttributableImpl: Sendable, HDF5Attributable {
-    var id: hid_t { get }
-}
+protocol HDF5AttributableImpl: Sendable, HDF5Attributable { var id: hid_t { get } }
 
 extension HDF5AttributableImpl {
-    public var name: String {
-        get async throws {
-            return try await HDF5.h5Iget_name(id: id)
-        }
-    }
+    public var name: String { get async throws { return try await HDF5.h5Iget_name(id: id) } }
 
-    public var fileName: String {
-        get async throws {
-            return try await HDF5.h5Fget_name(id: id)
-        }
-    }
+    public var fileName: String { get async throws { return try await HDF5.h5Fget_name(id: id) } }
 
     /// Writes an attribute whose HDF5 datatype is inferred automatically from the
     /// Swift type of `value`.
@@ -79,10 +66,7 @@ extension HDF5AttributableImpl {
     /// try await dataset.writeAttribute("scale", value: Double(1.5))
     /// try await dataset.writeAttribute("label", value: "temperature")
     /// ```
-    public func writeAttribute<T: HDF5AttributeType>(
-        _ name: String,
-        value: T
-    ) async throws {
+    public func writeAttribute<T: HDF5AttributeType>(_ name: String, value: T) async throws {
         try await HDF5.writeAttribute(name, on: id, value: value)
     }
 
