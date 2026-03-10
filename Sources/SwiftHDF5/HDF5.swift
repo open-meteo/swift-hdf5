@@ -1,10 +1,22 @@
 import CHDF5
 import Foundation
 
+/// Controls how an HDF5 file is opened or created.
+///
+/// Pass one of these values to ``HDF5/createFile(_:mode:)`` or
+/// ``HDF5/openFile(_:mode:)`` to specify the desired access behaviour.
 public enum FileAccessMode: Sendable {
+    /// Open an existing file for reading only. The file must already exist;
+    /// if it does not, ``HDF5Error/fileOpenFailed(_:)`` is thrown.
     case readOnly
+    /// Open an existing file for both reading and writing. The file must
+    /// already exist; if it does not, ``HDF5Error/fileOpenFailed(_:)`` is thrown.
     case readWrite
+    /// Create a new file, overwriting it if it already exists. This is the
+    /// default mode for ``HDF5/createFile(_:mode:)``.
     case truncate
+    /// Create a new file, failing with ``HDF5Error/fileCreateFailed(_:)`` if a
+    /// file at the given path already exists.
     case exclusive
 
     var cMode: UInt32 {
@@ -22,22 +34,64 @@ public typealias hid_t = CHDF5.hid_t
 
 // MARK: - HDF5 Datatype
 
+/// Native HDF5 type identifiers for use with ``HDF5FileOrGroup/createDataset(_:datatype:dataspace:)``.
+///
+/// Each property returns the HDF5 identifier (`hid_t`) for the corresponding
+/// platform-native C type. The mapping to Swift types is:
+///
+/// | Property       | Swift type  |
+/// |----------------|-------------|
+/// | ``int8``       | `Int8`      |
+/// | ``int16``      | `Int16`     |
+/// | ``int32``      | `Int32`     |
+/// | ``int64``      | `Int64`     |
+/// | ``uint8``      | `UInt8`     |
+/// | ``uint16``     | `UInt16`    |
+/// | ``uint32``     | `UInt32`    |
+/// | ``uint64``     | `UInt64`    |
+/// | ``float``      | `Float`     |
+/// | ``double``     | `Double`    |
+/// | ``char``       | `CChar`     |
 public enum HDF5Datatype {
+    /// The native signed 8-bit integer type (`H5T_NATIVE_INT8`). Corresponds to Swift's `Int8`.
     public static var int8: hid_t { hdf5_get_native_int8() }
+    /// The native signed 16-bit integer type (`H5T_NATIVE_INT16`). Corresponds to Swift's `Int16`.
     public static var int16: hid_t { hdf5_get_native_int16() }
+    /// The native signed 32-bit integer type (`H5T_NATIVE_INT32`). Corresponds to Swift's `Int32`.
     public static var int32: hid_t { hdf5_get_native_int32() }
+    /// The native signed 64-bit integer type (`H5T_NATIVE_INT64`). Corresponds to Swift's `Int64`.
     public static var int64: hid_t { hdf5_get_native_int64() }
+    /// The native unsigned 8-bit integer type (`H5T_NATIVE_UINT8`). Corresponds to Swift's `UInt8`.
     public static var uint8: hid_t { hdf5_get_native_uint8() }
+    /// The native unsigned 16-bit integer type (`H5T_NATIVE_UINT16`). Corresponds to Swift's `UInt16`.
     public static var uint16: hid_t { hdf5_get_native_uint16() }
+    /// The native unsigned 32-bit integer type (`H5T_NATIVE_UINT32`). Corresponds to Swift's `UInt32`.
     public static var uint32: hid_t { hdf5_get_native_uint32() }
+    /// The native unsigned 64-bit integer type (`H5T_NATIVE_UINT64`). Corresponds to Swift's `UInt64`.
     public static var uint64: hid_t { hdf5_get_native_uint64() }
+    /// The native 32-bit floating-point type (`H5T_NATIVE_FLOAT`). Corresponds to Swift's `Float`.
     public static var float: hid_t { hdf5_get_native_float() }
+    /// The native 64-bit floating-point type (`H5T_NATIVE_DOUBLE`). Corresponds to Swift's `Double`.
     public static var double: hid_t { hdf5_get_native_double() }
+    /// The native C `char` type (`H5T_NATIVE_CHAR`). Corresponds to Swift's `CChar`.
     public static var char: hid_t { hdf5_get_native_char() }
 }
 
-// MARK: - Serializes ALL HDF5 C calls on a single background thread to ensure thread safety
+// MARK: - Thread-safe entry point
 
+/// The top-level namespace for creating and opening HDF5 files and dataspaces.
+///
+/// ## Thread safety
+///
+/// The HDF5 C library is **not thread-safe by default**. All calls into the C
+/// library are serialised through a single internal `DispatchQueue`
+/// (`SwiftHDF5.single-thread`). Every `async` method on this type and on the
+/// objects it returns (`HDF5File`, `HDF5Group`, `HDF5Dataset`, …) suspends the
+/// caller and resumes on that queue, so concurrent calls from multiple Swift
+/// `Task`s are safe — they are simply queued and executed one at a time.
+///
+/// There is no need to add any additional synchronisation when using this
+/// library from multiple tasks or actors.
 public enum HDF5 {
     private static let queue = DispatchQueue(
         label: "SwiftHDF5.single-thread"
@@ -69,6 +123,17 @@ public enum HDF5 {
 
     // MARK: - File operations
 
+    /// Creates a new HDF5 file at `path`.
+    ///
+    /// - Parameters:
+    ///   - path: The filesystem path at which the file should be created.
+    ///   - mode: How the file should be created. Defaults to ``FileAccessMode/truncate``,
+    ///     which overwrites any existing file. Use ``FileAccessMode/exclusive`` to
+    ///     fail instead of overwriting.
+    /// - Returns: An ``HDF5File`` handle for the newly created file.
+    /// - Throws: ``HDF5Error/fileCreateFailed(_:)`` if the C library returns an error
+    ///   (e.g. the parent directory does not exist, or the file already exists when
+    ///   using ``FileAccessMode/exclusive``).
     static public func createFile(_ path: String, mode: FileAccessMode = .truncate) async throws -> HDF5File {
         let fileId = await execute {
             path.withCString { cPath in
@@ -79,6 +144,16 @@ public enum HDF5 {
         return HDF5File(id: fileId)
     }
 
+    /// Opens an existing HDF5 file at `path`.
+    ///
+    /// - Parameters:
+    ///   - path: The filesystem path of the file to open.
+    ///   - mode: The access mode. Defaults to ``FileAccessMode/readOnly``. Use
+    ///     ``FileAccessMode/readWrite`` to open the file for writing without
+    ///     truncating it.
+    /// - Returns: An ``HDF5File`` handle for the opened file.
+    /// - Throws: ``HDF5Error/fileOpenFailed(_:)`` if the file does not exist or
+    ///   cannot be opened with the requested access mode.
     static public func openFile(_ path: String, mode: FileAccessMode = .readOnly) async throws -> HDF5File {
         let fileId = await execute {
             path.withCString { cPath in
@@ -131,6 +206,17 @@ public enum HDF5 {
 
     // MARK: - Dataspace operations
 
+    /// Creates a simple (rectilinear) dataspace with the given dimensions.
+    ///
+    /// Pass the resulting ``HDF5Dataspace`` to
+    /// ``HDF5FileOrGroup/createDataset(_:datatype:dataspace:)`` to define the
+    /// shape of a new dataset.
+    ///
+    /// - Parameter dimensions: The size of each dimension, in elements. For
+    ///   example, `[3, 4]` produces a 3×4 matrix dataspace.
+    /// - Returns: An ``HDF5Dataspace`` representing the described shape.
+    /// - Throws: ``HDF5Error/dataspaceCreateFailed`` if the C library returns
+    ///   an error (e.g. `dimensions` is empty).
     static public func createDataspace(dimensions: [hsize_t]) async throws -> HDF5Dataspace {
         let spaceId = await execute {
             dimensions.withUnsafeBufferPointer { ptr in
