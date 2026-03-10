@@ -36,7 +36,20 @@ static inline hid_t hdf5_get_native_float(void) { return H5T_NATIVE_FLOAT; }
 static inline hid_t hdf5_get_native_double(void) { return H5T_NATIVE_DOUBLE; }
 static inline hid_t hdf5_get_native_char(void) { return H5T_NATIVE_CHAR; }
 
-// String type helper
+// String type helpers
 static inline hid_t hdf5_get_c_s1(void) { return H5T_C_S1; }
+// H5T_VARIABLE is a macro that cannot be imported directly into Swift
+static inline size_t hdf5_variable_length_string_size(void) { return H5T_VARIABLE; }
+
+// Variable-length memory reclaim compatibility shim.
+// H5Treclaim was introduced in HDF5 1.12.0 as a direct replacement for the
+// deprecated H5Dvlen_reclaim.
+static inline herr_t hdf5_vlen_reclaim(hid_t type_id, hid_t space_id, hid_t plist_id, void *buf) {
+#if H5_VERSION_GE(1, 12, 0)
+    return H5Treclaim(type_id, space_id, plist_id, buf);
+#else
+    return H5Dvlen_reclaim(type_id, space_id, plist_id, buf);
+#endif
+}
 
 #endif // CHDF5_SHIM_H
