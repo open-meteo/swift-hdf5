@@ -1,8 +1,18 @@
-public protocol HDF5Attributable: Sendable {
+public protocol HDF5Attributable {
+    var name: String { get async throws }
+    var fileName: String { get async throws }
+    func writeAttribute<T: HDF5AttributeType>(
+        _ name: String,
+        value: T
+    ) async throws
+    func readAttribute<T: HDF5AttributeType>(_ name: String) async throws -> T
+}
+
+protocol HDF5AttributableImpl: Sendable, HDF5Attributable {
     var id: hid_t { get }
 }
 
-extension HDF5Attributable {
+extension HDF5AttributableImpl {
     public var name: String {
         get async throws {
             return try await HDF5.h5Iget_name(id: id)
@@ -41,5 +51,5 @@ extension HDF5Attributable {
 
 }
 
-extension HDF5Group: HDF5Attributable {}
-extension HDF5Dataset: HDF5Attributable {}
+extension HDF5Group: HDF5AttributableImpl {}
+extension HDF5Dataset: HDF5AttributableImpl {}
