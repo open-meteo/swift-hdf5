@@ -437,4 +437,11 @@ struct SwiftHDF5Tests {
             let _: [Double] = try await dataset.readDataset(reusing: buffer)
         }
     }
+
+    @Test("Simple dataspace dimensions round-trips correctly")
+    func testSimpleDataspaceDimensions() async throws {
+        let space = try await HDF5.createDataspace(dimensions: [6, 7, 2])
+        let dims = try await space.dimensions
+        #expect(dims == [6, 7, 2])
+    }
 }
